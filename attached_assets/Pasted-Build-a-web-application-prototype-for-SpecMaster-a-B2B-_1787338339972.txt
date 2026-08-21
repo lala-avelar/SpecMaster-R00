@@ -1,0 +1,48 @@
+Build a web application prototype for "SpecMaster", a B2B SaaS specification management platform for the construction industry (AEC sector).
+
+**Visual & Experience Style Guidelines:**
+
+- Combine the robust, professional aesthetic of Procore (construction domain, status indicators, executive dashboard feel) with the clean, minimalist, highly flexible UX of Notion (databases, view switchers, soft pastel highlights).
+- Clean, modern B2B SaaS interface using Tailwind CSS and Lucide icons.
+- Responsive layout with a sleek left sidebar navigation (Projects, Specifications, Suppliers, Settings).
+
+**Main Screen to Build: "Project Specification Grid" (Tela de Matriz de Especificações)**
+
+1. HEADER & TOP ACTIONS:
+- Display Project Title: "Ed. Santa Mônica"
+- Primary Action Button (Highlighted): "+ Importar Memorial/Projeto em PDF" (Opens a modal for file drop/upload simulation).
+- Secondary Action Buttons:
+    - "Compartilhar Link" (Generates a shareable view link)
+    - "Exportar PDF" (Triggers a print/export action)
+- Notion-style View Switcher (Tabs or Toggle Buttons):
+    - [ Table View ] (Default)
+    - [ Board View ] (Kanban layout grouped by environment)
+1. DATA GRID / TABLE VIEW (Interactive Component):
+Columns in exact order:
+2. Ambiente (Environment - e.g., Cozinha, Banheiro)
+3. Item / Descrição (Item Description - e.g., Porcelanato Polido)
+4. Dimensão (Dimensions - e.g., 90x90 cm)
+5. Acabamento (Finish - e.g., Polido, Acetinado)
+6. Marca / Fornecedor (Brand/Supplier - e.g., Portobello, Deca)
+7. Verba Teto (R$) (Target Budget - numeric/currency)
+8. Preço Atual Cotado (R$) (Current Quoted Price - numeric/currency)
+
+CRITICAL BUDGET HIGHLIGHT RULE:
+
+- Do NOT include a separate "Status" column.
+- Automatically calculate budget status: If "Preço Atual Cotado" <= "Verba Teto", highlight the ENTIRE ROW background in soft, light green.
+- If "Preço Atual Cotado" > "Verba Teto", highlight the ENTIRE ROW background in soft, light red.
+1. BOARD / KANBAN VIEW (Notion Style):
+- Group cards into columns by "Ambiente" (e.g., Cozinha, Banheiro, Área Comum).
+- Each Card inside the environment column must display:
+    - Product thumbnail / photo placeholder.
+    - Item Title & Brand/Supplier.
+    - Tags for "Dimensão" and "Acabamento".
+    - Footer showing: "Verba Teto: R$ X" vs "Preço Cotado: R$ Y".
+    - Card border/background tinted Soft Green (if within budget) or Soft Red (if over budget).
+1. INITIAL DUMMY DATA TO PRE-POPULATE:
+- Row 1: Ambiente: "Cozinha" | Item: "Porcelanato Polido" | Dimensão: "90x90 cm" | Acabamento: "Polido" | Marca: "Portobello" | Verba Teto: "120.00" | Preço Cotado: "105.00" (Must render GREEN)
+- Row 2: Ambiente: "Banheiro" | Item: "Bacia com Caixa Acoplada" | Dimensão: "-" | Acabamento: "Branco Brilho" | Marca: "Deca" | Verba Teto: "650.00" | Preço Cotado: "780.00" (Must render RED)
+- Row 3: Ambiente: "Área Comum" | Item: "Tinta Acrílica Premium" | Dimensão: "18L" | Acabamento: "Fosco" | Marca: "Suvinil" | Verba Teto: "450.00" | Preço Cotado: "420.00" (Must render GREEN)
+
+Make the view toggle fully functional and allow adding inline rows or editing values directly in the table to test the dynamic green/red row background changes in real-time.

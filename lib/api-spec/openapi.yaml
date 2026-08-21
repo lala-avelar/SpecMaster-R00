@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: projects
+    description: Project and specification operations
 paths:
   /healthz:
     get:
@@ -24,7 +26,101 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /projects:
+    get:
+      operationId: listProjects
+      tags: [projects]
+      summary: List specification projects
+      responses:
+        "200":
+          description: Projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+  /projects/{projectId}:
+    get:
+      operationId: getProject
+      tags: [projects]
+      summary: Get a project and its specification rows
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectDetail"
+        "404":
+          description: Project not found
+  /projects/{projectId}/specifications:
+    post:
+      operationId: createSpecification
+      tags: [projects]
+      summary: Add a specification row
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SpecificationInput"
+      responses:
+        "201":
+          description: Created specification
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Specification"
+  /projects/{projectId}/specifications/{specificationId}:
+    patch:
+      operationId: updateSpecification
+      tags: [projects]
+      summary: Update a specification row
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/SpecificationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SpecificationInput"
+      responses:
+        "200":
+          description: Updated specification
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Specification"
+    delete:
+      operationId: deleteSpecification
+      tags: [projects]
+      summary: Delete a specification row
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/SpecificationId"
+      responses:
+        "204":
+          description: Deleted
 components:
+  parameters:
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      schema:
+        type: string
+    SpecificationId:
+      name: specificationId
+      in: path
+      required: true
+      schema:
+        type: string
   schemas:
     HealthStatus:
       type: object
@@ -33,4 +129,58 @@ components:
           type: string
       required:
         - status
+    Project:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        client:
+          type: string
+        location:
+          type: string
+        completion:
+          type: number
+        updatedAt:
+          type: string
+      required: [id, name, client, location, completion, updatedAt]
+    ProjectDetail:
+      allOf:
+        - $ref: "#/components/schemas/Project"
+        - type: object
+          properties:
+            specifications:
+              type: array
+              items:
+                $ref: "#/components/schemas/Specification"
+          required: [specifications]
+    SpecificationInput:
+      type: object
+      properties:
+        environment:
+          type: string
+        item:
+          type: string
+        dimension:
+          type: string
+        finish:
+          type: string
+        brand:
+          type: string
+        budget:
+          type: number
+        quotedPrice:
+          type: number
+      required: [environment, item, dimension, finish, brand, budget, quotedPrice]
+    Specification:
+      allOf:
+        - $ref: "#/components/schemas/SpecificationInput"
+        - type: object
+          properties:
+            id:
+              type: string
+            updatedAt:
+              type: string
+          required: [id, updatedAt]
 
