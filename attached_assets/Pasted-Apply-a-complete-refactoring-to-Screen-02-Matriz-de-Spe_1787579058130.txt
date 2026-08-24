@@ -1,0 +1,47 @@
+Apply a complete refactoring to Screen 02 ("Matriz de Specs") in the SpecMaster prototype with the following layout, column breakdown, and action triggers:
+
+1. GLOBAL UI & COLOR PALETTE:
+- Theme: Clean B2B corporate look using Pure White (#FFFFFF), Soft Cool Gray (#F8F9FA) containers, Dark Charcoal/Slate text (#111827), and subtle yellow/gold for primary action buttons.
+- Keep the left sidebar, but add a top breadcrumb and project switcher: "Projetos > [ Ed. Santa Mônica ▾ ]".
+
+2. TOP NAVIGATION & MACRO-ZONES (Tabs):
+- Add top zone switcher tabs above the specification grid:
+  [ Apartamentos ] (Active by default) | [ Áreas Comuns ] | [ Fachada ]
+
+3. TABLE CATEGORY GROUPING (Accordion Rows):
+Structure the grid into collapsible category headers:
+- Group 1: 🧱 REVESTIMENTOS (Piso, Parede, Soleira, Rodapé, Bancadas)
+- Group 2: 🚰 LOUÇAS E METAIS (Cubas, Bacias, Torneiras, Ralos)
+- Group 3: 🔌 COMPLEMENTARES & ELÉTRICA (Portas, Fechaduras, Tomadas)
+
+4. EXACT TABLE COLUMNS (Left to Right):
+1. Cômodo / Ambiente (e.g., "Cozinha", "Banho Master", "Hall Apartamentos")
+2. Elemento (e.g., "Piso", "Parede", "Bancada", "Torneira", "Cuba")
+3. Item / Descrição (e.g., "Porcelanato Bianco Covelano", "Granito Preto São Gabriel")
+4. Dimensão (e.g., "90x90 cm", "18L", "56x34 cm")
+5. Acabamento (e.g., "Natural Retificado", "Polido", "Branco Brilho")
+6. Marca / Fornecedor (e.g., "Portobello", "Deca", "Suvinil")
+7. Verba Teto (R$) (Editable target unit budget)
+8. Preço Cotado (R$) (Editable current quote)
+9. Rev. (Revision badge - e.g., "R05")
+10. Aprovado Por (Avatar/Name of approver - e.g., "Felipe (Orçamento)" or "Lucas (Projeto)")
+11. Ações (Contains an interactive button: "Solicitar Troca")
+
+5. DYNAMIC BUDGET COLOR RULES:
+- If "Preço Cotado" <= "Verba Teto": Highlight the ENTIRE ROW background in Soft Light Green (#F0FDF4).
+- If "Preço Cotado" > "Verba Teto": Highlight the ENTIRE ROW background in Soft Light Red (#FEF2F2).
+
+6. INTERACTIVE ACTION ("Solicitar Troca"):
+- Clicking the "Solicitar Troca" button opens a side drawer or modal displaying:
+  - Current Item details vs. Proposed Replacement Item
+  - Cost difference indicator (+R$ / -R$)
+  - Input field for change reason ("Motivo da solicitação")
+  - Buttons: "Enviar para Aprovação Simultânea" and "Cancelar"
+
+7. PRE-FILLED DUMMY DATA:
+- Row 1 (Revestimentos): Cômodo: "Hall Apartamentos" | Elemento: "Piso" | Item/Descrição: "Porcelanato Bianco Covelano" | Dimensão: "90x90 cm" | Acabamento: "Nat. Retificado" | Marca: "Portobello" | Verba Teto: "140.00" | Preço Cotado: "135.00" | Rev: "R05" | Aprovado Por: "Felipe M." (Must render GREEN)
+- Row 2 (Revestimentos): Cômodo: "Cozinha" | Elemento: "Bancada" | Item/Descrição: "Granito Preto São Gabriel" | Dimensão: "h=90 cm" | Acabamento: "Polido" | Marca: "Marmoraria Z" | Verba Teto: "450.00" | Preço Cotado: "520.00" | Rev: "R05" | Aprovado Por: "Pendente" (Must render RED)
+- Row 3 (Louças e Metais): Cômodo: "Banho Master" | Elemento: "Cuba" | Item/Descrição: "Cuba Semiencaixe c/ mesa L830.17" | Dimensão: "Square" | Acabamento: "Branco Brilho" | Marca: "Deca" | Verba Teto: "380.00" | Preço Cotado: "360.00" | Rev: "R04" | Aprovado Por: "Lucas A." (Must render GREEN)
+- Row 4 (Louças e Metais): Cômodo: "Cozinha" | Elemento: "Torneira" | Item/Descrição: "Torneira de Mesa Just (1167.C27)" | Dimensão: "-" | Acabamento: "Cromado" | Marca: "Deca" | Verba Teto: "290.00" | Preço Cotado: "340.00" | Rev: "R05" | Aprovado Por: "Pendente" (Must render RED)
+
+Maintain top action bar buttons: "+ Importar PDF", "Compartilhar Link" and "Exportar PDF".

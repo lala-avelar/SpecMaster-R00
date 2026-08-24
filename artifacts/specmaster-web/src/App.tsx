@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import {
   getGetProjectQueryKey,
@@ -57,6 +57,11 @@ const queryClient = new QueryClient();
 
 type LocalProject = Project;
 type LocalSpec = Specification;
+type MatrixSpec = LocalSpec & {
+  element: string;
+  revision: string;
+  approver: string;
+};
 
 const FALLBACK_PROJECTS: LocalProject[] = [
   {
@@ -94,6 +99,13 @@ const FALLBACK_SPECS: LocalSpec[] = [
   { id: 'spec-6', environment: 'Suíte master', item: 'Arandela de leitura', dimension: 'Ø 120 × 180 mm', finish: 'Latão escovado', brand: 'Lumini — Lume', budget: 4600, quotedPrice: 4980, updatedAt: '2024-06-15T09:47:00Z' },
   { id: 'spec-7', environment: 'Banho casal', item: 'Metais de bancada', dimension: 'Monocomando 240 mm', finish: 'Grafite escovado', brand: 'Docol — Lift', budget: 7800, quotedPrice: 7240, updatedAt: '2024-06-13T17:28:00Z' },
   { id: 'spec-8', environment: 'Varanda', item: 'Esquadria de correr', dimension: '4800 × 2400 mm', finish: 'Alumínio champanhe', brand: 'Ação Esquadrias', budget: 27500, quotedPrice: 30120, updatedAt: '2024-06-12T13:02:00Z' },
+];
+
+const MATRIX_SPECS: MatrixSpec[] = [
+  { id: 'spec-1', environment: 'Hall Apartamentos', element: 'Piso', item: 'Porcelanato Bianco Covelano', dimension: '90x90 cm', finish: 'Nat. Retificado', brand: 'Portobello', budget: 140, quotedPrice: 135, revision: 'R05', approver: 'Felipe M.', updatedAt: '2024-06-18T16:42:00Z' },
+  { id: 'spec-2', environment: 'Cozinha', element: 'Bancada', item: 'Granito Preto São Gabriel', dimension: 'h=90 cm', finish: 'Polido', brand: 'Marmoraria Z', budget: 450, quotedPrice: 520, revision: 'R05', approver: 'Pendente', updatedAt: '2024-06-17T14:05:00Z' },
+  { id: 'spec-3', environment: 'Banho Master', element: 'Cuba', item: 'Cuba Semiencaixe c/ mesa L830.17', dimension: 'Square', finish: 'Branco Brilho', brand: 'Deca', budget: 380, quotedPrice: 360, revision: 'R04', approver: 'Lucas A.', updatedAt: '2024-06-17T11:26:00Z' },
+  { id: 'draft-row4', environment: 'Cozinha', element: 'Torneira', item: 'Torneira de Mesa Just (1167.C27)', dimension: '-', finish: 'Cromado', brand: 'Deca', budget: 290, quotedPrice: 340, revision: 'R05', approver: 'Pendente', updatedAt: '2024-06-16T18:14:00Z' },
 ];
 
 const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
@@ -303,7 +315,7 @@ function MatrixPage() {
   const updateSpecification = useUpdateSpecification();
   const deleteSpecification = useDeleteSpecification();
   const queryClient = useQueryClient();
-  const [localSpecs, setLocalSpecs] = useState<LocalSpec[]>([]);
+  const [localSpecs, setLocalSpecs] = useState<MatrixSpec[]>([]);
   const [initializedId, setInitializedId] = useState<string | null>(null);
   const [view, setView] = useState<'table' | 'board'>('table');
   const [search, setSearch] = useState('');
@@ -311,17 +323,32 @@ function MatrixPage() {
   const [importStep, setImportStep] = useState<'idle' | 'ready' | 'done'>('idle');
   const [notice, setNotice] = useState('');
   const [shareState, setShareState] = useState(false);
+  const [zone, setZone] = useState<'Apartamentos' | 'Áreas Comuns' | 'Fachada'>('Apartamentos');
+  const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({
+    'Revestimentos': true,
+    'Louças e Metais': true,
+    'Complementares & Elétrica': true,
+  });
+  const [changeRequest, setChangeRequest] = useState<MatrixSpec | null>(null);
+  const [changeReason, setChangeReason] = useState('');
 
   useEffect(() => {
     if (projectQuery.data && initializedId !== id) {
-      setLocalSpecs(projectQuery.data.specifications);
+      setLocalSpecs(id === 'ed-santa-monica' ? MATRIX_SPECS : projectQuery.data.specifications.map((row) => ({
+        ...row,
+        element: 'Elemento',
+        revision: 'R01',
+        approver: 'Pendente',
+      })));
       setInitializedId(id);
     }
   }, [projectQuery.data, initializedId, id]);
 
   const project = projectQuery.data ?? FALLBACK_PROJECTS.find((item) => item.id === id) ?? FALLBACK_PROJECTS[0];
-  const specs = localSpecs.length || initializedId === id ? localSpecs : FALLBACK_SPECS;
-  const filtered = useMemo(() => specs.filter((row) => [row.environment, row.item, row.dimension, row.finish, row.brand].join(' ').toLowerCase().includes(search.toLowerCase())), [specs, search]);
+  const specs: MatrixSpec[] = localSpecs.length || initializedId === id ? localSpecs : MATRIX_SPECS;
+  const filtered = useMemo(() => specs.filter((row) => [row.environment, row.element, row.item, row.dimension, row.finish, row.brand].join(' ').toLowerCase().includes(search.toLowerCase())), [specs, search]);
+  const categoryFor = (row: MatrixSpec) => row.element === 'Cuba' || row.element === 'Torneira' ? 'Louças e Metais' : row.element === 'Piso' || row.element === 'Bancada' ? 'Revestimentos' : 'Complementares & Elétrica';
+  const groupedRows = useMemo(() => ['Revestimentos', 'Louças e Metais', 'Complementares & Elétrica'].map((category) => ({ category, rows: filtered.filter((row) => categoryFor(row) === category) })), [filtered]);
   const environments = useMemo(() => Array.from(new Set(filtered.map((row) => row.environment))), [filtered]);
   const totalBudget = specs.reduce((sum, row) => sum + Number(row.budget || 0), 0);
   const totalQuoted = specs.reduce((sum, row) => sum + Number(row.quotedPrice || 0), 0);
@@ -332,13 +359,13 @@ function MatrixPage() {
     window.setTimeout(() => setNotice(''), 3200);
   };
 
-  const updateLocal = (row: LocalSpec) => setLocalSpecs((current) => current.map((item) => item.id === row.id ? row : item));
-  const saveRow = (row: LocalSpec) => {
+  const updateLocal = (row: MatrixSpec) => setLocalSpecs((current) => current.map((item) => item.id === row.id ? row : item));
+  const saveRow = (row: MatrixSpec) => {
     const payload: SpecificationInput = { environment: row.environment, item: row.item, dimension: row.dimension, finish: row.finish, brand: row.brand, budget: Number(row.budget) || 0, quotedPrice: Number(row.quotedPrice) || 0 };
     if (row.id.startsWith('draft-')) {
       createSpecification.mutate({ projectId: id, data: payload }, {
         onSuccess: (created) => {
-          setLocalSpecs((current) => current.map((item) => item.id === row.id ? created : item));
+           setLocalSpecs((current) => current.map((item) => item.id === row.id ? { ...created, element: row.element, revision: row.revision, approver: row.approver } : item));
           queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(id) });
           pushNotice('Item adicionado à matriz.');
         },
@@ -347,7 +374,7 @@ function MatrixPage() {
     } else {
       updateSpecification.mutate({ projectId: id, specificationId: row.id, data: payload }, {
         onSuccess: (updated) => {
-          updateLocal(updated);
+           updateLocal({ ...updated, element: row.element, revision: row.revision, approver: row.approver });
           queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(id) });
           pushNotice('Alteração salva.');
         },
@@ -358,12 +385,12 @@ function MatrixPage() {
 
   const addRow = () => {
     const draft: LocalSpec = { id: `draft-${Date.now()}`, environment: 'Novo ambiente', item: 'Novo item', dimension: '—', finish: '—', brand: 'A definir', budget: 0, quotedPrice: 0, updatedAt: new Date().toISOString() };
-    setLocalSpecs((current) => [draft, ...current]);
+    setLocalSpecs((current) => [{ ...draft, element: 'Elemento', revision: 'R01', approver: 'Pendente' }, ...current]);
     setInitializedId(id);
     pushNotice('Linha nova criada. Edite os campos e salve.');
   };
 
-  const removeRow = (row: LocalSpec) => {
+  const removeRow = (row: MatrixSpec) => {
     if (row.id.startsWith('draft-')) {
       setLocalSpecs((current) => current.filter((item) => item.id !== row.id));
       return;
@@ -384,9 +411,9 @@ function MatrixPage() {
   };
 
   const completeImport = () => {
-    const importedRows: LocalSpec[] = [
-      { id: `draft-import-${Date.now()}`, environment: 'Lavabo', item: 'Cuba de apoio', dimension: 'Ø 400 × 140 mm', finish: 'Cerâmica branca', brand: 'Deca', budget: 2800, quotedPrice: 2650, updatedAt: new Date().toISOString() },
-      { id: `draft-import-${Date.now() + 1}`, environment: 'Lavabo', item: 'Espelho orgânico', dimension: '900 × 700 mm', finish: 'Borda lapidada', brand: 'Vidraçaria Norte', budget: 1900, quotedPrice: 2140, updatedAt: new Date().toISOString() },
+    const importedRows: MatrixSpec[] = [
+      { id: `draft-import-${Date.now()}`, environment: 'Lavabo', element: 'Cuba', item: 'Cuba de apoio', dimension: 'Ø 400 × 140 mm', finish: 'Cerâmica branca', brand: 'Deca', budget: 2800, quotedPrice: 2650, revision: 'R01', approver: 'Pendente', updatedAt: new Date().toISOString() },
+      { id: `draft-import-${Date.now() + 1}`, environment: 'Lavabo', element: 'Complementar', item: 'Espelho orgânico', dimension: '900 × 700 mm', finish: 'Borda lapidada', brand: 'Vidraçaria Norte', budget: 1900, quotedPrice: 2140, revision: 'R01', approver: 'Pendente', updatedAt: new Date().toISOString() },
     ];
     setLocalSpecs((current) => [...importedRows, ...current]);
     setImportStep('done');
@@ -423,7 +450,10 @@ function MatrixPage() {
         <div><span>FORA DA VERBA</span><strong className={overBudgetCount ? 'over-text' : 'under-text'}>{overBudgetCount.toString().padStart(2, '0')}</strong><small>{overBudgetCount ? 'pedem revisão' : 'tudo sob controle'}</small></div>
         <div className="matrix-progress-wrap"><div className="summary-progress"><span style={{ width: `${Math.min((totalQuoted / Math.max(totalBudget, 1)) * 100, 100)}%` }} /></div><small>{Math.round((totalQuoted / Math.max(totalBudget, 1)) * 100)}% da verba comprometida</small></div>
       </section>
-      <section className="matrix-toolbar">
+       <section className="matrix-zones" role="tablist" aria-label="Zona do projeto">
+         {(['Apartamentos', 'Áreas Comuns', 'Fachada'] as const).map((item) => <button type="button" key={item} className={zone === item ? 'selected' : ''} onClick={() => setZone(item)} data-testid={`button-zone-${item}`}>{item}</button>)}
+       </section>
+       <section className="matrix-toolbar">
         <div className="view-switcher" role="tablist" aria-label="Modo de visualização">
           <button type="button" className={view === 'table' ? 'selected' : ''} onClick={() => setView('table')} data-testid="button-view-table"><List size={15} /> Tabela</button>
           <button type="button" className={view === 'board' ? 'selected' : ''} onClick={() => setView('board')} data-testid="button-view-board"><Grid2X2 size={15} /> Quadro</button>
@@ -437,7 +467,7 @@ function MatrixPage() {
       </section>
       {projectQuery.isError && <div className="query-note matrix-error" data-testid="status-project-error">A API não respondeu. Você está vendo a última fotografia disponível. <button type="button" onClick={() => projectQuery.refetch()} data-testid="button-retry-project">Tentar novamente</button></div>}
       {view === 'table' ? (
-        <SpecificationTable rows={filtered} onChange={updateLocal} onSave={saveRow} onDelete={removeRow} />
+         <SpecificationTable groups={groupedRows} openCategories={openCategories} onToggleCategory={(category) => setOpenCategories((current) => ({ ...current, [category]: !current[category] }))} onChange={updateLocal} onSave={saveRow} onDelete={removeRow} onRequestChange={setChangeRequest} />
       ) : (
         <SpecificationBoard rows={filtered} environments={environments} onChange={updateLocal} onSave={saveRow} onDelete={removeRow} />
       )}
@@ -445,6 +475,7 @@ function MatrixPage() {
       <footer className="matrix-footer"><span><span className="legend-dot green" /> Dentro da verba <span className="legend-dot red" /> Acima da verba</span><span className="font-mono-ui">Última sincronização 09:38:12</span></footer>
       {notice && <div className="toast-note page-enter" role="status" data-testid="status-matrix-toast"><Check size={15} /> {notice}</div>}
       {importOpen && <ImportModal step={importStep} onClose={() => { setImportOpen(false); setImportStep('idle'); }} onSimulate={simulateImport} onComplete={completeImport} />}
+      {changeRequest && <ChangeRequestModal row={changeRequest} reason={changeReason} onReasonChange={setChangeReason} onClose={() => { setChangeRequest(null); setChangeReason(''); }} onSubmit={() => { setChangeRequest(null); setChangeReason(''); pushNotice('Solicitação enviada para aprovação simultânea.'); }} />}
     </div>
   );
 }
@@ -453,35 +484,41 @@ function EditableCell({ value, onChange, onCommit, numeric, testId }: { value: s
   return <input className={`editable-cell ${numeric ? 'numeric-cell' : ''}`} type={numeric ? 'number' : 'text'} value={value} onChange={(event) => onChange(event.target.value)} onBlur={onCommit} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} data-testid={testId} />;
 }
 
-function SpecificationTable({ rows, onChange, onSave, onDelete }: { rows: LocalSpec[]; onChange: (row: LocalSpec) => void; onSave: (row: LocalSpec) => void; onDelete: (row: LocalSpec) => void }) {
-  const edit = (row: LocalSpec, key: keyof LocalSpec, value: string) => onChange({ ...row, [key]: key === 'budget' || key === 'quotedPrice' ? Number(value) : value });
+function SpecificationTable({ groups, openCategories, onToggleCategory, onChange, onSave, onDelete, onRequestChange }: { groups: { category: string; rows: MatrixSpec[] }[]; openCategories: Record<string, boolean>; onToggleCategory: (category: string) => void; onChange: (row: MatrixSpec) => void; onSave: (row: MatrixSpec) => void; onDelete: (row: MatrixSpec) => void; onRequestChange: (row: MatrixSpec) => void }) {
+  const edit = (row: MatrixSpec, key: keyof MatrixSpec, value: string) => onChange({ ...row, [key]: key === 'budget' || key === 'quotedPrice' ? Number(value) : value });
   return (
     <div className="table-frame">
       <div className="spec-table" role="table" aria-label="Matriz de especificações">
         <div className="spec-row spec-head" role="row">
-          <div>Ambiente</div><div>Item / Descrição</div><div>Dimensão</div><div>Acabamento</div><div>Marca / Fornecedor</div><div>Verba Teto (R$)</div><div>Preço Atual Cotado (R$)</div><div />
+          <div>Cômodo / Ambiente</div><div>Elemento</div><div>Item / Descrição</div><div>Dimensão</div><div>Acabamento</div><div>Marca / Fornecedor</div><div>Verba Teto (R$)</div><div>Preço Cotado (R$)</div><div>Rev.</div><div>Aprovado por</div><div>Ações</div>
         </div>
-        {rows.map((row) => {
-          const under = Number(row.quotedPrice) <= Number(row.budget);
-          return (
-            <div className={`spec-row ${under ? 'row-under' : 'row-over'}`} role="row" key={row.id} data-testid={`row-spec-${row.id}`}>
-              <div><EditableCell value={row.environment} onChange={(value) => edit(row, 'environment', value)} onCommit={() => onSave(row)} testId={`input-environment-${row.id}`} /></div>
-              <div className="item-cell"><span className={`row-state ${under ? 'state-under' : 'state-over'}`} /><EditableCell value={row.item} onChange={(value) => edit(row, 'item', value)} onCommit={() => onSave(row)} testId={`input-item-${row.id}`} /></div>
-              <div><EditableCell value={row.dimension} onChange={(value) => edit(row, 'dimension', value)} onCommit={() => onSave(row)} testId={`input-dimension-${row.id}`} /></div>
-              <div><EditableCell value={row.finish} onChange={(value) => edit(row, 'finish', value)} onCommit={() => onSave(row)} testId={`input-finish-${row.id}`} /></div>
-              <div><EditableCell value={row.brand} onChange={(value) => edit(row, 'brand', value)} onCommit={() => onSave(row)} testId={`input-brand-${row.id}`} /></div>
-              <div><EditableCell value={row.budget} onChange={(value) => edit(row, 'budget', value)} onCommit={() => onSave(row)} numeric testId={`input-budget-${row.id}`} /></div>
-              <div><EditableCell value={row.quotedPrice} onChange={(value) => edit(row, 'quotedPrice', value)} onCommit={() => onSave(row)} numeric testId={`input-quoted-${row.id}`} /></div>
-              <div className="row-actions">{row.id.startsWith('draft-') && <button type="button" className="save-row" onClick={() => onSave(row)} data-testid={`button-save-row-${row.id}`}><Check size={14} /></button>}<IconButton label={`Remover ${row.item}`} className="delete-row" testId={`button-delete-row-${row.id}`} onClick={() => onDelete(row)}><Trash2 size={14} /></IconButton></div>
-            </div>
-          );
-        })}
+        {groups.map(({ category, rows }) => <Fragment key={category}>
+          <button type="button" className="spec-category" onClick={() => onToggleCategory(category)} aria-expanded={openCategories[category]}><ChevronDown size={15} className={openCategories[category] ? '' : 'collapsed'} /><span>{category}</span><small>{rows.length} itens</small></button>
+          {openCategories[category] && rows.map((row) => {
+            const under = Number(row.quotedPrice) <= Number(row.budget);
+            return (
+              <div className={`spec-row ${under ? 'row-under' : 'row-over'}`} role="row" key={row.id} data-testid={`row-spec-${row.id}`}>
+                <div><EditableCell value={row.environment} onChange={(value) => edit(row, 'environment', value)} onCommit={() => onSave(row)} testId={`input-environment-${row.id}`} /></div>
+                <div><EditableCell value={row.element} onChange={(value) => edit(row, 'element', value)} onCommit={() => onSave(row)} testId={`input-element-${row.id}`} /></div>
+                <div className="item-cell"><EditableCell value={row.item} onChange={(value) => edit(row, 'item', value)} onCommit={() => onSave(row)} testId={`input-item-${row.id}`} /></div>
+                <div><EditableCell value={row.dimension} onChange={(value) => edit(row, 'dimension', value)} onCommit={() => onSave(row)} testId={`input-dimension-${row.id}`} /></div>
+                <div><EditableCell value={row.finish} onChange={(value) => edit(row, 'finish', value)} onCommit={() => onSave(row)} testId={`input-finish-${row.id}`} /></div>
+                <div><EditableCell value={row.brand} onChange={(value) => edit(row, 'brand', value)} onCommit={() => onSave(row)} testId={`input-brand-${row.id}`} /></div>
+                <div><EditableCell value={row.budget} onChange={(value) => edit(row, 'budget', value)} onCommit={() => onSave(row)} numeric testId={`input-budget-${row.id}`} /></div>
+                <div><EditableCell value={row.quotedPrice} onChange={(value) => edit(row, 'quotedPrice', value)} onCommit={() => onSave(row)} numeric testId={`input-quoted-${row.id}`} /></div>
+                <div><span className="revision-badge">{row.revision}</span></div>
+                <div><span className={row.approver === 'Pendente' ? 'approver-pending' : 'approver'}>{row.approver}</span></div>
+                <div className="row-actions"><button type="button" className="change-button" onClick={() => onRequestChange(row)} data-testid={`button-request-change-${row.id}`}>Solicitar troca</button>{row.id.startsWith('draft-') && <button type="button" className="save-row" onClick={() => onSave(row)} data-testid={`button-save-row-${row.id}`}><Check size={14} /></button>}<IconButton label={`Remover ${row.item}`} className="delete-row" testId={`button-delete-row-${row.id}`} onClick={() => onDelete(row)}><Trash2 size={14} /></IconButton></div>
+              </div>
+            );
+          })}
+        </Fragment>)}
       </div>
     </div>
   );
 }
 
-function SpecificationBoard({ rows, environments, onChange, onSave, onDelete }: { rows: LocalSpec[]; environments: string[]; onChange: (row: LocalSpec) => void; onSave: (row: LocalSpec) => void; onDelete: (row: LocalSpec) => void }) {
+function SpecificationBoard({ rows, environments, onChange, onSave, onDelete }: { rows: MatrixSpec[]; environments: string[]; onChange: (row: MatrixSpec) => void; onSave: (row: MatrixSpec) => void; onDelete: (row: MatrixSpec) => void }) {
   return (
     <div className="board-grid">
       {environments.map((environment) => (
@@ -496,7 +533,7 @@ function SpecificationBoard({ rows, environments, onChange, onSave, onDelete }: 
   );
 }
 
-function BoardCard({ row, onChange, onSave, onDelete }: { row: LocalSpec; onChange: (row: LocalSpec) => void; onSave: (row: LocalSpec) => void; onDelete: (row: LocalSpec) => void }) {
+function BoardCard({ row, onChange, onSave, onDelete }: { row: MatrixSpec; onChange: (row: MatrixSpec) => void; onSave: (row: MatrixSpec) => void; onDelete: (row: MatrixSpec) => void }) {
   const under = Number(row.quotedPrice) <= Number(row.budget);
   const edit = (key: keyof LocalSpec, value: string) => onChange({ ...row, [key]: key === 'budget' || key === 'quotedPrice' ? Number(value) : value });
   return (
@@ -519,6 +556,24 @@ function ImportModal({ step, onClose, onSimulate, onComplete }: { step: 'idle' |
         {step === 'idle' && <><label className="drop-zone" htmlFor="import-file"><CloudUpload size={30} /><strong>Solte seu .xlsx aqui</strong><span>ou selecione um arquivo do computador</span><input id="import-file" type="file" accept=".xlsx,.csv" onChange={onSimulate} data-testid="input-import-file" /></label><div className="modal-footnote"><FileSpreadsheet size={15} /> A primeira linha deve conter os nomes das colunas.</div></>}
         {step === 'ready' && <div className="import-ready"><div className="import-file"><FileSpreadsheet size={20} /><span><strong>matriz-santa-monica.xlsx</strong><small>12 KB · leitura concluída</small></span><Check size={17} /></div><div className="import-preview"><span>PRÉVIA DA LEITURA</span><strong>2 novas linhas encontradas</strong><p>Os itens serão adicionados como rascunho para revisão.</p></div><button type="button" className="button button-primary full-button" onClick={onComplete} data-testid="button-confirm-import"><Download size={15} /> Adicionar à matriz</button></div>}
         {step === 'done' && <div className="import-done"><span className="done-mark"><Check size={28} /></span><h3>Importação concluída</h3><p>As linhas foram adicionadas no topo da matriz e estão prontas para revisão.</p><button type="button" className="button button-primary full-button" onClick={onClose} data-testid="button-finish-import">Voltar à matriz</button></div>}
+      </div>
+    </div>
+  );
+}
+
+function ChangeRequestModal({ row, reason, onReasonChange, onClose, onSubmit }: { row: MatrixSpec; reason: string; onReasonChange: (value: string) => void; onClose: () => void; onSubmit: () => void }) {
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <div className="import-modal change-request-modal page-enter" role="dialog" aria-modal="true" aria-labelledby="change-request-title">
+        <div className="modal-top"><div><p className="section-kicker">FLUXO DE APROVAÇÃO</p><h2 id="change-request-title">Solicitar troca</h2></div><IconButton label="Fechar solicitação" testId="button-close-change-request" onClick={onClose}><X size={18} /></IconButton></div>
+        <div className="change-comparison">
+          <div><span>ITEM ATUAL</span><strong>{row.item}</strong><small>{row.brand} · {money(Number(row.quotedPrice))}</small></div>
+          <ArrowUpRight size={18} />
+          <div><span>ITEM PROPOSTO</span><strong>A definir</strong><small>Informe o novo item após enviar</small></div>
+        </div>
+        <div className="cost-difference"><span>Diferença estimada</span><strong className={Number(row.quotedPrice) > Number(row.budget) ? 'over-text' : 'under-text'}>{Number(row.quotedPrice) > Number(row.budget) ? '+' : '-'}{money(Math.abs(Number(row.quotedPrice) - Number(row.budget)))}</strong></div>
+        <label className="reason-field"><span>Motivo da solicitação</span><textarea value={reason} onChange={(event) => onReasonChange(event.target.value)} placeholder="Explique por que este item precisa ser substituído." data-testid="input-change-reason" /></label>
+        <div className="modal-actions"><button type="button" className="button button-quiet" onClick={onClose}>Cancelar</button><button type="button" className="button button-primary" onClick={onSubmit} disabled={!reason.trim()} data-testid="button-submit-change-request">Enviar para Aprovação Simultânea</button></div>
       </div>
     </div>
   );
