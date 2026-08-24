@@ -42,7 +42,6 @@ import {
   Settings,
   Share2,
   SlidersHorizontal,
-  Sparkles,
   Trash2,
   Upload,
   Users,
@@ -118,8 +117,13 @@ function IconButton({ label, children, onClick, className = '', testId }: { labe
 
 function Shell({ children }: { children: ReactNode }) {
   const [location] = useLocation();
+  const [, setLocation] = useLocation();
   const [notice, setNotice] = useState('');
   const health = useHealthCheck({ query: { queryKey: getHealthCheckQueryKey(), staleTime: 60000 } });
+  const projectsQuery = useListProjects({ query: { queryKey: getListProjectsQueryKey(), staleTime: 30000 } });
+  const projects = projectsQuery.data?.length ? projectsQuery.data : FALLBACK_PROJECTS;
+  const activeProjectId = location.match(/^\/projects\/([^/]+)/)?.[1] ?? 'ed-santa-monica';
+  const activeProject = projects.find((project) => project.id === activeProjectId) ?? projects[0];
   const isProject = location.startsWith('/projects/');
 
   const pushNotice = (message: string) => {
@@ -172,7 +176,24 @@ function Shell({ children }: { children: ReactNode }) {
           </div>
         </div>
       </aside>
-      <main className="main-canvas">{children}</main>
+      <main className="main-canvas">
+        <div className="project-switcher-bar" data-testid="project-switcher">
+          <span className="breadcrumb-link">Projetos</span>
+          <span className="breadcrumb-separator">›</span>
+          <label className="project-select-wrap">
+            <span className="sr-only">Selecionar projeto</span>
+            <select
+              value={activeProject?.id ?? 'ed-santa-monica'}
+              onChange={(event) => setLocation(`/projects/${event.target.value}`)}
+              data-testid="select-project-switcher"
+            >
+              {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+            </select>
+            <ChevronDown size={14} />
+          </label>
+        </div>
+        {children}
+      </main>
       {notice && (
         <div className="toast-note page-enter" role="status" data-testid="status-toast">
           <Check size={15} /> {notice}
@@ -208,25 +229,17 @@ function Portfolio() {
     <div className="page-wrap page-enter">
       <Topbar
         eyebrow="PORTFÓLIO / 2024"
-        title="Bom dia, Marina."
+        title="Visão operacional"
         action={<button type="button" className="button button-primary" onClick={() => window.alert('A criação de projetos será habilitada pelo administrador.')} data-testid="button-new-project"><Plus size={16} /> Novo projeto</button>}
       />
-      <section className="portfolio-intro stagger-1">
-        <div>
-          <p className="section-kicker"><span className="kicker-line" /> VISÃO DE OBRA</p>
-          <h2>Projetos que pedem<br /><span>atenção aos detalhes.</span></h2>
-        </div>
-        <p className="intro-copy">Acompanhe o pulso das especificações, do primeiro orçamento à última aprovação.</p>
-      </section>
-      <section className="metric-strip stagger-2" aria-label="Resumo do portfólio">
+      <section className="metric-strip compact-metrics stagger-1" aria-label="Resumo do portfólio">
         <div className="metric-cell"><span className="metric-label">Projetos ativos</span><strong data-testid="text-active-projects">{projectCount.toString().padStart(2, '0')}</strong><small>+ 1 nesta semana</small></div>
         <div className="metric-cell"><span className="metric-label">Itens em revisão</span><strong>24</strong><small className="warning-text">6 precisam de retorno</small></div>
         <div className="metric-cell"><span className="metric-label">Aderência à verba</span><strong>82,4<span>%</span></strong><small className="success-text">+4,8% no mês</small></div>
-        <div className="metric-cell metric-note"><Sparkles size={17} /><span>O controle começa<br />na próxima decisão.</span></div>
       </section>
-      <section className="portfolio-section stagger-3">
+      <section className="portfolio-section stagger-2">
         <div className="section-heading">
-          <div><p className="section-kicker">EM ANDAMENTO</p><h3>Projetos em foco</h3></div>
+          <div><p className="section-kicker">EM ANDAMENTO</p><h3>Projetos ativos</h3></div>
           <span className="muted-label">Atualizado hoje, 09:38</span>
         </div>
         <div className="project-grid">
@@ -237,7 +250,7 @@ function Portfolio() {
         </div>
         {projectsQuery.isError && <div className="query-note" data-testid="status-projects-error">Exibindo a última fotografia salva. <button type="button" onClick={() => projectsQuery.refetch()} data-testid="button-retry-projects">Tentar novamente</button></div>}
       </section>
-      <section className="activity-section stagger-4">
+      <section className="activity-section compact-activity stagger-3">
         <div className="section-heading"><div><p className="section-kicker">RASTRO RECENTE</p><h3>O que mudou</h3></div><button type="button" className="text-button" data-testid="button-view-activity">Ver atividade completa <ArrowUpRight size={15} /></button></div>
         <div className="activity-list">
           <ActivityItem mark="AR" label="André Ribeiro" action="atualizou a verba de" target="Painel ripado em lâmina" project="Ed. Santa Mônica" time="há 18 min" tone="amber" />
@@ -523,7 +536,7 @@ function EmptyPage({ type }: { type: 'suppliers' | 'settings' }) {
       <div className={`useful-empty ${isSuppliers ? 'suppliers-empty' : 'settings-empty'}`}>
         <div className="empty-orbit"><div className="orbit-ring ring-one" /><div className="orbit-ring ring-two" />{isSuppliers ? <Users size={34} /> : <Settings size={34} />}</div>
         <p className="section-kicker">{isSuppliers ? 'DIRETÓRIO DE COMPRAS' : 'SEU WORKSPACE'}</p>
-        <h2>{isSuppliers ? 'Um lugar para cada<br /><span>parceiro de confiança.</span>' : 'Ajustes que deixam<br /><span>o trabalho no ritmo certo.</span>'}</h2>
+         <h2>{isSuppliers ? <>Um lugar para cada<br /><span>parceiro de confiança.</span></> : <>Ajustes que deixam<br /><span>o trabalho no ritmo certo.</span></>}</h2>
         <p>{isSuppliers ? 'O diretório ainda está vazio. Cadastre os fornecedores que acompanham suas obras para encontrar marcas, contatos e condições sem sair do contexto da especificação.' : 'As preferências do workspace serão liberadas quando sua equipe começar a compartilhar matrizes. Por enquanto, seu espaço já está funcionando com as configurações essenciais.'}</p>
         <div className="empty-actions">{isSuppliers ? <button type="button" className="button button-primary" onClick={() => window.alert('Convite de fornecedor preparado.')} data-testid="button-invite-supplier"><Users size={15} /> Convidar fornecedor</button> : <Link href="/" className="button button-primary" data-testid="link-settings-portfolio"><LayoutDashboard size={15} /> Voltar ao portfólio</Link>}<button type="button" className="text-button" onClick={() => window.alert('Guia rápido aberto.')} data-testid="button-empty-guide">Como funciona <ArrowUpRight size={15} /></button></div>
       </div>

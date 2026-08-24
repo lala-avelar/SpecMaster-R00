@@ -152,13 +152,13 @@ function ProjectHome({
               style={[
                 styles.itemCard,
                 {
-                  backgroundColor: withinBudget ? colors.card : '#f8e9e6',
-                  borderColor: withinBudget ? colors.border : '#e7c5bf',
+                  backgroundColor: withinBudget ? colors.card : '#FEF2F2',
+                  borderColor: withinBudget ? colors.border : '#FECACA',
                 },
               ]}
             >
               <View style={styles.itemTop}>
-                <View style={[styles.environmentPill, { backgroundColor: withinBudget ? colors.accent : '#f3d8d2' }]}>
+                <View style={[styles.environmentPill, { backgroundColor: withinBudget ? colors.accent : '#FEE2E2' }]}>
                   <Text style={[styles.environmentText, { color: colors.foreground }]}>{item.environment}</Text>
                 </View>
                 <Feather name={expanded ? 'chevron-up' : 'chevron-down'} size={17} color={colors.mutedForeground} />
@@ -303,5 +303,5 @@ const styles = StyleSheet.create({
   statusDot: { width: 8, height: 8, borderRadius: 4, marginLeft: 12, marginBottom: 5 },
   priceInput: { minWidth: 100, borderBottomWidth: 1, paddingVertical: 2, fontSize: 16, fontWeight: '700' },
   primaryButton: { paddingHorizontal: 18, paddingVertical: 12, borderRadius: 12, marginTop: 8 },
-  primaryButtonText: { color: '#fff', fontWeight: '700' },
+  primaryButtonText: { color: '#FFFFFF', fontWeight: '700' },
 });
