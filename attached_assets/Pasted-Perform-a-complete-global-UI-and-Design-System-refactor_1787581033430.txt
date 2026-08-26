@@ -1,0 +1,61 @@
+Perform a complete global UI and Design System refactoring across the entire SpecMaster application according to the following strict specifications:
+
+1. CSS VARIABLES & COLOR PALETTE (Inject in global CSS / Tailwind config):
+Create and enforce these global color variables across all screens, cards, sidebars, and tables:
+--bg-page: #F6F6F6 (Main page background)
+--bg-card: #FFFFFF (Cards, panels, modal backgrounds)
+--border: #EDEEEC (Subtle borders and dividers)
+--text-primary: #1F1F1F (Primary text, headings)
+--text-secondary: #6B6B6B (Metadata, descriptions, secondary labels)
+--accent: #0075DE (Vibrant Blue - Primary action buttons, links, active states)
+--accent-dark: #02093A (Navy Blue - Top header, navigation bar, dark cards)
+--success: #0F7B6C (Status "Aprovado", "Sincronizado", Within Budget)
+--warning: #DFAB01 (Status "Revisão Pendente", "Dados Offline")
+--danger: #E03E3E (Status "Erro", "Especificação Obsoleta", Over Budget)
+
+2. TYPOGRAPHY (Google Font Inter):
+- Import and apply 'Inter' sans-serif as the default font family for the entire app.
+- Headings: Bold (weight 700 / 600).
+- Subtitles & Section headers: Weight 500 (~21px).
+- Body text: Weight 400 (16px).
+- Secondary text & Table metadata: Weight 400 (15px / 14px).
+- Buttons & Badges: Weight 500 (14px - 16px).
+
+3. BRANDING & HEADER (SPECMASTER):
+- Top Bar / Header: Use --accent-dark (#02093A) background with crisp white text.
+- Brand Logo: Display "SPECMASTER" in bold, geometric, clean sans-serif typography.
+- Logo Icon: Abstract, modern geometric icon representing Precision + Connection (AEC integration).
+- Top Right Toolbar: Include user profile, "Sync Status" indicator badge (show "Sincronizado" with --success dot), and a project switcher breadcrumb: "Projetos > [ Ed. Santa Mônica ▾ ]".
+
+4. COMPONENT STYLING & ACCESSIBILITY:
+- Cards: Background --bg-card (#FFFFFF), border: 1px solid --border (#EDEEEC), border-radius: 8px, generous internal padding.
+- Primary Buttons: Background --accent (#0075DE), text #FFFFFF, border-radius: 8px (rectangular, minimum touch target 44x44px).
+- Secondary Buttons: Outline style with border --border (#EDEEEC) or transparent with hover states.
+- Status Badges: Pill shape (border-radius: 9999px) with ultra-light tint background of the respective status color (--success, --warning, --danger) and solid text.
+- High Contrast & Field-First: High contrast (min 7:1) for readability in all light conditions.
+
+5. PRESERVE SCREEN 2 ("MATRIZ DE SPECS") STRUCTURE & DATA GRID:
+Maintain all functional features built for the specification grid within this new design system:
+- Top Macro-zone Tabs: [ Apartamentos ] (Active) | [ Áreas Comuns ] | [ Fachada ]
+- Collapsible Category Group Headers:
+  - 🧱 REVESTIMENTOS
+  - 🚰 LOUÇAS E METAIS
+  - 🔌 COMPLEMENTARES & ELÉTRICA
+- Table Columns (Exact Order):
+  1. Cômodo / Ambiente
+  2. Elemento
+  3. Item / Descrição
+  4. Dimensão
+  5. Acabamento
+  6. Marca / Fornecedor
+  7. Verba Teto (R$)
+  8. Preço Cotado (R$)
+  9. Rev. (e.g., "R05")
+  10. Aprovado Por (Avatar/Text)
+  11. Ações (Interactive Button: "Solicitar Troca")
+- Dynamic Row Colors (Budget Rule):
+  - If "Preço Cotado" <= "Verba Teto": Set row background to very light green (#F0FDF4 / tinted --success).
+  - If "Preço Cotado" > "Verba Teto": Set row background to very light red (#FEF2F2 / tinted --danger).
+- Interactive "Solicitar Troca" Drawer/Modal: Styled with --bg-card, showing proposed replacement, cost delta (+/- R$), reason input, and primary button "Enviar para Aprovação".
+
+Ensure all pages (Dashboard/Portfolio, Matriz de Specs, Fornecedores) strictly follow this clean Notion-like, field-first UI with the new color variables and typography.

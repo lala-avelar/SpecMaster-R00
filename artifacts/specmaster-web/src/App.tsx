@@ -190,19 +190,8 @@ function Shell({ children }: { children: ReactNode }) {
       </aside>
       <main className="main-canvas">
         <div className="project-switcher-bar" data-testid="project-switcher">
-          <span className="breadcrumb-link">Projetos</span>
-          <span className="breadcrumb-separator">›</span>
-          <label className="project-select-wrap">
-            <span className="sr-only">Selecionar projeto</span>
-            <select
-              value={activeProject?.id ?? 'ed-santa-monica'}
-              onChange={(event) => setLocation(`/projects/${event.target.value}`)}
-              data-testid="select-project-switcher"
-            >
-              {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
-            </select>
-            <ChevronDown size={14} />
-          </label>
+           <div className="project-switcher-main"><span className="breadcrumb-link">Projetos</span><span className="breadcrumb-separator">›</span><label className="project-select-wrap"><span className="sr-only">Selecionar projeto</span><select value={activeProject?.id ?? 'ed-santa-monica'} onChange={(event) => setLocation(`/projects/${event.target.value}`)} data-testid="select-project-switcher">{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select><ChevronDown size={14} /></label></div>
+           <div className="header-toolbar"><span className="sync-badge"><span className="status-dot" /> Sincronizado</span><span className="header-profile"><span className="profile-avatar">MR</span><strong>Marina Reis</strong></span></div>
         </div>
         {children}
       </main>

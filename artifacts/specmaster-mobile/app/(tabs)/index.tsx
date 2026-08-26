@@ -184,7 +184,7 @@ function ProjectHome({
                   <Text style={[styles.priceLabel, { color: colors.mutedForeground }]}>VERBA TETO</Text>
                   <Text style={[styles.budget, { color: colors.mutedForeground }]}>{money(item.budget)}</Text>
                 </View>
-                <View style={[styles.statusDot, { backgroundColor: withinBudget ? '#6d9a7c' : colors.destructive }]} />
+                <View style={[styles.statusDot, { backgroundColor: withinBudget ? colors.success : colors.danger }]} />
               </View>
             </Pressable>
           );

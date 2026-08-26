@@ -1,0 +1,49 @@
+Perform a complete structural, functional, and UI refactoring of the SpecMaster application according to the following specifications:
+
+1. GLOBAL DESIGN SYSTEM & PALETTE:
+- Backgrounds: Pure White (#FFFFFF), Soft Light Gray (#F6F6F6), Dark Graphite/Black (#1F1F1F) for text.
+- Accent Colors: Use ONLY subtle, precise touches of Yellow (#DFAB01) and Blue (#0075DE). Avoid large colored blocks.
+- Typography: Increase default body/table text size slightly (16px base, 14px secondary) using 'Inter' font for superior readability.
+1. NAVIGATION, SIDEBAR & PROJECT MANAGEMENT:
+- Fix Navigation Behavior:
+    - DO NOT automatically redirect to "Ed. Santa Mônica" when clicking "Matriz de specs".
+    - Remove the concept of a single "Primary/Default Project".
+    - Under "Matriz de specs" in the left sidebar, create a collapsible submenu listing all active projects (e.g., "Ed. Santa Mônica", "Reserva Ipanema", "Novo Projeto +"). Clicking a project in the sidebar opens that specific project's matrix.
+- Project Creation: Enable fully functional project creation via a modal when clicking "+ Novo Projeto".
+- Relocate the "+ Novo Projeto" button on Screen 01 directly next to the "Projetos Ativos" section header for immediate visual identification.
+1. SCREEN 01 (PORTFÓLIO / DASHBOARD):
+- "Itens em revisão": Render text/badge "X precisam de retorno" in solid RED (#E03E3E).
+- "Projetos Ativos": Remove beige background tint. Increase background contrast (clean white card on #F6F6F6 page) with crisp dark text.
+1. SCREEN 02 (HEADER, MACRO-ZONES & METRICS):
+- Macro-Zone Navigation Tabs: Make "Apartamentos", "Áreas Comuns", and "Fachada" significantly LARGER and prominently displayed as the main tab bar.
+- Macro-Zone Separation: Treat "Apartamentos", "Áreas Comuns", and "Fachada" as completely separate independent tables. Changing tabs switches the table data entirely.
+- Budget Overrun Alerts (RED):
+    - If "Atualmente Cotado" > "Verba Total", highlight the quoted price text in RED (#E03E3E).
+    - Highlight "X itens fora da verba pedem revisão" in solid RED.
+    - Set the budget progress bar to solid RED when the target budget is compromised (>100%).
+- Project Activity Log: Include a dedicated activity/audit log ("Rastro de Alterações") specific to the current project at the bottom of Screen 02.
+1. SPECIFICATION MATRIX TABLE REFACTORING (TELA 02):
+- Remove Kanban view completely. Remove the Kanban switcher toggle.
+- Category Headers: Rename "Complementares & Elétrica" to simply "Acessórios Complementares". Keep the 3 category accordions: 🧱 REVESTIMENTOS, 🚰 LOUÇAS E METAIS, 🔌 COMPLEMENTARES.
+- Repeat Table Column Headers inside each Category Group for visual alignment.
+- Remove Column: Remove the "Rev." (Revision) column entirely.
+- Environment Grouping (Merged Cells): Group/merge multiple items belonging to the same environment within a category (e.g., "Cozinha" displaying rows for Piso, Bancada, and Parede under a single merged "Cozinha" cell, like Excel merged cells).
+- Table Actions & Change Approval Flow:
+    - Filtering: Fix table filtering functionality. Add a filter option for "Últimas Alterações" (Recently Modified).
+    - Exporting: Change export action to export ONLY the specification table (NOT the full page) with two options: [ Exportar PDF ] and [ Exportar CSV ].
+    - "Solicitar Troca" Modal: Update the approval request flow. Include a dropdown selector for "Pessoa/Setor Responsável" (e.g., "Marina Reis (Arquitetura)", "Felipe (Orçamento)") and an option to "Enviar para Aprovação Simultânea".
+1. NEW SPECIFICATION CREATION MODAL & SUPPLIER AUTO-SYNC:
+- Remove direct bottom row inline insertion. Clicking "+ Adicionar Linha" MUST open a Modal/Pop-up titled "Cadastrar Nova Especificação".
+- Modal Fields (with predictive placeholder suggestions, but fully editable text inputs):
+    1. Macrozona (Select: Apartamentos, Áreas Comuns, Fachada)
+    2. Categoria (Select: Revestimentos, Louças e Metais, Complementares)
+    3. Cômodo / Ambiente
+    4. Elemento (Piso, Parede, Torneira, etc.)
+    5. Item / Descrição
+    6. Dimensão
+    7. Acabamento
+    8. Marca / Fornecedor
+    9. Verba Teto (R$)
+    10. Preço Cotado (R$)
+    11. Responsável pela Aprovação
+- Supplier Directory Integration: When a new specification is created with a supplier name, automatically register/sync that material item into a dedicated "Supplier Folder" inside the "Fornecedores" tab, categorized under that supplier's profile.
