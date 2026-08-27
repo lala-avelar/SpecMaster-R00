@@ -1,0 +1,68 @@
+name: Deploy SpecMaster web para GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'artifacts/specmaster-web/**'
+      - 'lib/**'
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/deploy-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Instalar dependências (web + libs)
+        run: pnpm install --frozen-lockfile --filter "@workspace/specmaster-web..."
+
+      - name: Build (base = /SpecMaster-R00/)
+        run: pnpm --filter @workspace/specmaster-web run build
+        env:
+          NODE_ENV: production
+          PORT: 21233
+          BASE_PATH: /SpecMaster-R00/
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: artifacts/specmaster-web/dist/public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

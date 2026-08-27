@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SpecMaster</title>
+    <script>
+      // Redireciona qualquer rota interna (ex: /SpecMaster-R00/projects/...) de volta
+      // ao index.html, já que o GitHub Pages não tem SPA fallback nativo.
+      var base = window.location.pathname.split('/')[1];
+      window.location.replace(window.location.origin + '/' + base + '/');
+    </script>
+  </head>
+  <body>
+    <p>Redirecionando…</p>
+  </body>
+</html>
