@@ -26,6 +26,7 @@ export interface SpecificationInput {
   brand: string;
   budget: number;
   quotedPrice: number;
+  areaTotal?: number;
 }
 
 export type Specification = SpecificationInput & {

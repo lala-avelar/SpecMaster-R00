@@ -53,7 +53,8 @@ export const GetProjectResponse = zod.object({
   "finish": zod.string(),
   "brand": zod.string(),
   "budget": zod.number(),
-  "quotedPrice": zod.number()
+  "quotedPrice": zod.number(),
+  "areaTotal": zod.number().optional()
 }).and(zod.object({
   "id": zod.string(),
   "updatedAt": zod.string()
@@ -75,7 +76,8 @@ export const CreateSpecificationBody = zod.object({
   "finish": zod.string(),
   "brand": zod.string(),
   "budget": zod.number(),
-  "quotedPrice": zod.number()
+  "quotedPrice": zod.number(),
+  "areaTotal": zod.number().optional()
 })
 
 export const CreateSpecificationResponse = zod.object({
@@ -85,7 +87,8 @@ export const CreateSpecificationResponse = zod.object({
   "finish": zod.string(),
   "brand": zod.string(),
   "budget": zod.number(),
-  "quotedPrice": zod.number()
+  "quotedPrice": zod.number(),
+  "areaTotal": zod.number().optional()
 }).and(zod.object({
   "id": zod.string(),
   "updatedAt": zod.string()
@@ -107,7 +110,8 @@ export const UpdateSpecificationBody = zod.object({
   "finish": zod.string(),
   "brand": zod.string(),
   "budget": zod.number(),
-  "quotedPrice": zod.number()
+  "quotedPrice": zod.number(),
+  "areaTotal": zod.number().optional()
 })
 
 export const UpdateSpecificationResponse = zod.object({
@@ -117,7 +121,8 @@ export const UpdateSpecificationResponse = zod.object({
   "finish": zod.string(),
   "brand": zod.string(),
   "budget": zod.number(),
-  "quotedPrice": zod.number()
+  "quotedPrice": zod.number(),
+  "areaTotal": zod.number().optional()
 }).and(zod.object({
   "id": zod.string(),
   "updatedAt": zod.string()

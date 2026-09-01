@@ -14,4 +14,5 @@ export interface SpecificationInput {
   brand: string;
   budget: number;
   quotedPrice: number;
+  areaTotal?: number;
 }

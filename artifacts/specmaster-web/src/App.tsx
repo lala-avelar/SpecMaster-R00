@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom';
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import * as XLSX from 'xlsx';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import {
@@ -144,18 +144,18 @@ const FALLBACK_SPECS: LocalSpec[] = [
 ];
 
 const MATRIX_SPECS: MatrixSpec[] = [
-  { id: 'spec-1', environment: 'Hall Apartamentos', element: 'Piso', item: 'Porcelanato Bianco Covelano', dimension: '90x90 cm', finish: 'Nat. Retificado', brand: 'Portobello', budget: 140, quotedPrice: 135, revision: 'R05', assignedTo: 'Felipe', status: 'aprovado', zone: 'Apartamentos', updatedAt: '2024-06-18T16:42:00Z' },
+  { id: 'spec-1', environment: 'Hall Apartamentos', element: 'Piso', item: 'Porcelanato Bianco Covelano', dimension: '90x90 cm', finish: 'Nat. Retificado', brand: 'Portobello', budget: 140, quotedPrice: 135, areaTotal: 42, revision: 'R05', assignedTo: 'Felipe', status: 'aprovado', zone: 'Apartamentos', updatedAt: '2024-06-18T16:42:00Z' },
   { id: 'spec-2', environment: 'Hall Apartamentos', element: 'Porta', item: 'Porta de madeira lisa', dimension: '80x210 cm', finish: 'Branco', brand: 'Madeireira Sul', budget: 420, quotedPrice: 410, revision: 'R04', assignedTo: 'Felipe', status: 'aprovado', zone: 'Apartamentos', updatedAt: '2024-06-15T10:10:00Z' },
   { id: 'spec-3', environment: 'Hall Apartamentos', element: 'Acabamento Elétrico', item: 'Interruptor paralelo', dimension: 'Bivolt', finish: 'Branco', brand: 'Pial', budget: 18, quotedPrice: 17, revision: 'R04', assignedTo: 'Lucas', status: 'aprovado', zone: 'Apartamentos', updatedAt: '2024-06-14T09:40:00Z' },
-  { id: 'spec-4', environment: 'Cozinha', element: 'Piso', item: 'Porcelanato Bianco Covelano', dimension: '90x90 cm', finish: 'Nat. Retificado', brand: 'Portobello', budget: 140, quotedPrice: 135, revision: 'R05', assignedTo: 'Felipe', status: 'aprovado', zone: 'Apartamentos', updatedAt: '2024-06-18T16:42:00Z' },
-  { id: 'spec-5', environment: 'Cozinha', element: 'Parede', item: 'Porcelanato Bianco Covelano', dimension: '90x90 cm', finish: 'Nat. Retificado', brand: 'Portobello', budget: 140, quotedPrice: 148, revision: 'R05', assignedTo: 'Marina Reis', status: 'pendente', zone: 'Apartamentos', updatedAt: '2024-06-17T14:05:00Z' },
-  { id: 'spec-6', environment: 'Cozinha', element: 'Rodapé', item: 'Rodapé polido 10 cm', dimension: '10x90 cm', finish: 'Polido', brand: 'Portobello', budget: 45, quotedPrice: 42, revision: 'R04', assignedTo: 'Lucas', status: 'aprovado', zone: 'Apartamentos', updatedAt: '2024-06-16T11:20:00Z' },
-  { id: 'spec-7', environment: 'Cozinha', element: 'Bancada', item: 'Granito Preto São Gabriel', dimension: 'h=90 cm', finish: 'Polido', brand: 'Marmoraria Z', budget: 450, quotedPrice: 520, revision: 'R05', assignedTo: 'Marina Reis', status: 'pendente', zone: 'Apartamentos', updatedAt: '2024-06-17T14:05:00Z' },
+  { id: 'spec-4', environment: 'Cozinha', element: 'Piso', item: 'Porcelanato Bianco Covelano', dimension: '90x90 cm', finish: 'Nat. Retificado', brand: 'Portobello', budget: 140, quotedPrice: 135, areaTotal: 38, revision: 'R05', assignedTo: 'Felipe', status: 'aprovado', zone: 'Apartamentos', updatedAt: '2024-06-18T16:42:00Z' },
+  { id: 'spec-5', environment: 'Cozinha', element: 'Parede', item: 'Porcelanato Bianco Covelano', dimension: '90x90 cm', finish: 'Nat. Retificado', brand: 'Portobello', budget: 140, quotedPrice: 148, areaTotal: 24, revision: 'R05', assignedTo: 'Marina Reis', status: 'pendente', zone: 'Apartamentos', updatedAt: '2024-06-17T14:05:00Z' },
+  { id: 'spec-6', environment: 'Cozinha', element: 'Rodapé', item: 'Rodapé polido 10 cm', dimension: '10x90 cm', finish: 'Polido', brand: 'Portobello', budget: 45, quotedPrice: 42, areaTotal: 32, revision: 'R04', assignedTo: 'Lucas', status: 'aprovado', zone: 'Apartamentos', updatedAt: '2024-06-16T11:20:00Z' },
+  { id: 'spec-7', environment: 'Cozinha', element: 'Bancada', item: 'Granito Preto São Gabriel', dimension: 'h=90 cm', finish: 'Polido', brand: 'Marmoraria Z', budget: 450, quotedPrice: 520, areaTotal: 3.5, revision: 'R05', assignedTo: 'Marina Reis', status: 'pendente', zone: 'Apartamentos', updatedAt: '2024-06-17T14:05:00Z' },
   { id: 'spec-8', environment: 'Cozinha', element: 'Torneira', item: 'Torneira de mesa de cozinha', dimension: 'Bica alta', finish: 'Escovado', brand: 'Deca', budget: 260, quotedPrice: 255, revision: 'R04', assignedTo: 'Lucas', status: 'aprovado', zone: 'Apartamentos', updatedAt: '2024-06-15T13:45:00Z' },
   { id: 'spec-9', environment: 'Cozinha', element: 'Sifão', item: 'Sifão flexível p/ cuba', dimension: '1 1/2"', finish: 'Cromado', brand: 'Tigre', budget: 35, quotedPrice: 38, revision: 'R04', assignedTo: 'Marina Reis', status: 'revisao', zone: 'Apartamentos', updatedAt: '2024-06-15T13:50:00Z' },
   { id: 'spec-10', environment: 'Cozinha', element: 'Iluminação', item: 'Spot LED embutido', dimension: 'Ø 90 mm', finish: '4000K', brand: 'Ledtech', budget: 60, quotedPrice: 58, revision: 'R04', assignedTo: 'Lucas', status: 'aprovado', zone: 'Apartamentos', updatedAt: '2024-06-14T08:12:00Z' },
-  { id: 'spec-11', environment: 'Banho Master', element: 'Piso', item: 'Porcelanato Bianco Covelano', dimension: '60x60 cm', finish: 'Nat. Retificado', brand: 'Portobello', budget: 110, quotedPrice: 108, revision: 'R04', assignedTo: 'Felipe', status: 'aprovado', zone: 'Apartamentos', updatedAt: '2024-06-16T09:00:00Z' },
-  { id: 'spec-12', environment: 'Banho Master', element: 'Parede', item: 'Pasta de vidro verde', dimension: '30x30 cm', finish: 'Fosco', brand: 'Portobello', budget: 95, quotedPrice: 122, revision: 'R04', assignedTo: 'Lucas', status: 'pendente', zone: 'Apartamentos', updatedAt: '2024-06-15T17:30:00Z' },
+  { id: 'spec-11', environment: 'Banho Master', element: 'Piso', item: 'Porcelanato Bianco Covelano', dimension: '60x60 cm', finish: 'Nat. Retificado', brand: 'Portobello', budget: 110, quotedPrice: 108, areaTotal: 12, revision: 'R04', assignedTo: 'Felipe', status: 'aprovado', zone: 'Apartamentos', updatedAt: '2024-06-16T09:00:00Z' },
+  { id: 'spec-12', environment: 'Banho Master', element: 'Parede', item: 'Pasta de vidro verde', dimension: '30x30 cm', finish: 'Fosco', brand: 'Portobello', budget: 95, quotedPrice: 122, areaTotal: 18, revision: 'R04', assignedTo: 'Lucas', status: 'pendente', zone: 'Apartamentos', updatedAt: '2024-06-15T17:30:00Z' },
   { id: 'spec-13', environment: 'Banho Master', element: 'Bancada', item: 'Granito Preto São Gabriel', dimension: 'h=80 cm', finish: 'Polido', brand: 'Marmoraria Z', budget: 320, quotedPrice: 315, revision: 'R04', assignedTo: 'Lucas', status: 'aprovado', zone: 'Apartamentos', updatedAt: '2024-06-15T15:22:00Z' },
   { id: 'spec-14', environment: 'Banho Master', element: 'Bacia Sanitária', item: 'Bacia com caixa acoplada', dimension: '-', finish: 'Branco Brilho', brand: 'Deca', budget: 650, quotedPrice: 610, revision: 'R05', assignedTo: 'Lucas', status: 'aprovado', zone: 'Apartamentos', updatedAt: '2024-06-16T10:15:00Z' },
   { id: 'spec-15', environment: 'Banho Master', element: 'Cuba', item: 'Cuba Semiencaixe c/ mesa L830.17', dimension: 'Square', finish: 'Branco Brilho', brand: 'Deca', budget: 380, quotedPrice: 360, revision: 'R04', assignedTo: 'Lucas', status: 'aprovado', zone: 'Apartamentos', updatedAt: '2024-06-15T11:26:00Z' },
@@ -252,6 +252,20 @@ function specCompletion(specs: MatrixSpec[]) {
   return Math.round((complete / specs.length) * 100);
 }
 
+function specArea(spec: MatrixSpec) {
+  return Number(spec.areaTotal) || 0;
+}
+
+function specTotalValue(spec: MatrixSpec) {
+  const area = specArea(spec);
+  return area > 0 ? Number(spec.quotedPrice || 0) * area : Number(spec.quotedPrice || 0);
+}
+
+function specBudgetValue(spec: MatrixSpec) {
+  const area = specArea(spec);
+  return area > 0 ? Number(spec.budget || 0) * area : Number(spec.budget || 0);
+}
+
 function mergeProjects(base: LocalProject[], local: LocalProject[]) {
   const ids = new Set(base.map((project) => project.id));
   return [...base, ...local.filter((project) => !ids.has(project.id))];
@@ -271,7 +285,7 @@ function productKey(spec: Pick<MatrixSpec, 'brand' | 'item' | 'finish' | 'dimens
   return [spec.brand, spec.item, spec.finish, spec.dimension].map((part) => normalizeHeader(part || '')).join('|');
 }
 
-function headerKind(key: string): keyof Pick<MatrixSpec, 'environment' | 'element' | 'item' | 'dimension' | 'finish' | 'brand' | 'budget' | 'quotedPrice'> | 'zone' | null {
+function headerKind(key: string): keyof Pick<MatrixSpec, 'environment' | 'element' | 'item' | 'dimension' | 'finish' | 'brand' | 'budget' | 'quotedPrice' | 'areaTotal'> | 'zone' | null {
   const k = normalizeHeader(key);
   if (k.includes('ambiente')) return 'environment';
   if (k.includes('elemento') || k.includes('element')) return 'element';
@@ -281,6 +295,7 @@ function headerKind(key: string): keyof Pick<MatrixSpec, 'environment' | 'elemen
   if (k.includes('marca') || k.includes('fornecedor')) return 'brand';
   if (k.includes('verba') || k.includes('previsto') || k.includes('orcamento') || k.includes('teto')) return 'budget';
   if (k.includes('cotado') || k.includes('preco') || k.includes('atual')) return 'quotedPrice';
+  if (k.includes('area') || k.includes('quantidade') || k.includes('m2')) return 'areaTotal';
   if (k.includes('macrozona') || k.includes('zona')) return 'zone';
   return null;
 }
@@ -335,7 +350,7 @@ function parseCsvText(text: string): Record<string, unknown>[] {
 
 function parseWorkbookRows(rows: Record<string, unknown>[]): MatrixSpec[] {
   const headers = Object.keys(rows[0] ?? {});
-  const map: Partial<Record<'environment' | 'element' | 'item' | 'dimension' | 'finish' | 'brand' | 'budget' | 'quotedPrice' | 'zone', string>> = {};
+  const map: Partial<Record<'environment' | 'element' | 'item' | 'dimension' | 'finish' | 'brand' | 'budget' | 'quotedPrice' | 'areaTotal' | 'zone', string>> = {};
   for (const header of headers) {
     const kind = headerKind(header);
     if (kind && map[kind] === undefined) map[kind] = header;
@@ -352,6 +367,7 @@ function parseWorkbookRows(rows: Record<string, unknown>[]): MatrixSpec[] {
       brand: String(row[map.brand ?? ''] ?? '').trim() || '—',
       budget: parseMoney(row[map.budget ?? '']),
       quotedPrice: parseMoney(row[map.quotedPrice ?? '']),
+      areaTotal: map.areaTotal ? parseMoney(row[map.areaTotal ?? '']) : 0,
       revision: 'R01',
       assignedTo: CURRENT_USER,
       status: 'pendente',
@@ -480,8 +496,8 @@ function Portfolio() {
   const completionOf = (projectId: string) => specCompletion(specsByProject[projectId] ?? []);
   const budgetOf = (projectId: string) => {
     const specs = specsByProject[projectId] ?? [];
-    const budget = specs.reduce((sum, row) => sum + Number(row.budget || 0), 0);
-    const quoted = specs.reduce((sum, row) => sum + Number(row.quotedPrice || 0), 0);
+    const budget = specs.reduce((sum, row) => sum + specBudgetValue(row), 0);
+    const quoted = specs.reduce((sum, row) => sum + specTotalValue(row), 0);
     return { budget, quoted, over: quoted > budget };
   };
   const onCreateProject = (input: { name: string; client: string; location: string; startWith: 'blank' | 'import' }) => {
@@ -696,7 +712,7 @@ function MatrixPage() {
   }, [projectQuery.data, specsByProject, id, seedProject]);
 
   const specs: MatrixSpec[] = specsByProject[id] ?? [];
-  const isOverBudget = (row: MatrixSpec) => Number(row.quotedPrice) > Number(row.budget);
+  const isOverBudget = (row: MatrixSpec) => specTotalValue(row) > specBudgetValue(row);
   const categoryFor = (row: MatrixSpec) => LOUCAS_E_METAIS.includes(row.element) ? 'Louças e Metais' : REVESTIMENTOS.includes(row.element) ? 'Revestimentos' : 'Complementares';
   const zoneSpecs = useMemo(() => specs.filter((row) => row.zone === zone), [specs, zone]);
   const zoneCounts = useMemo(() => ({
@@ -719,11 +735,11 @@ function MatrixPage() {
   }, [filtered, overBudgetOnly, myPendingOnly, approvalFilter, elementFilter, dimensionFilter, environmentFilter]);
   const ordered = useMemo(() => {
     if (sortMode !== 'risk') return budgetFiltered;
-    return [...budgetFiltered].sort((a, b) => ((Number(b.quotedPrice) - Number(b.budget)) - (Number(a.quotedPrice) - Number(a.budget))));
+    return [...budgetFiltered].sort((a, b) => ((specTotalValue(b) - specBudgetValue(b)) - (specTotalValue(a) - specBudgetValue(a))));
   }, [budgetFiltered, sortMode]);
   const groupedRows = useMemo(() => ['Revestimentos', 'Louças e Metais', 'Complementares'].map((category) => ({ category, rows: ordered.filter((row) => categoryFor(row) === category) })), [ordered]);
-  const totalBudget = zoneSpecs.reduce((sum, row) => sum + Number(row.budget || 0), 0);
-  const totalQuoted = zoneSpecs.reduce((sum, row) => sum + Number(row.quotedPrice || 0), 0);
+  const totalBudget = zoneSpecs.reduce((sum, row) => sum + specBudgetValue(row), 0);
+  const totalQuoted = zoneSpecs.reduce((sum, row) => sum + specTotalValue(row), 0);
   const overBudgetCount = zoneSpecs.filter(isOverBudget).length;
   const activeFilterCount = (overBudgetOnly ? 1 : 0) + (myPendingOnly ? 1 : 0) + (approvalFilter !== 'all' ? 1 : 0) + (elementFilter ? 1 : 0) + (dimensionFilter ? 1 : 0) + (environmentFilter ? 1 : 0);
 
@@ -743,7 +759,7 @@ function MatrixPage() {
 
   const updateLocal = (row: MatrixSpec) => setSpec(id, row);
   const saveRow = (row: MatrixSpec) => {
-    const payload: SpecificationInput = { environment: row.environment, item: row.item, dimension: row.dimension, finish: row.finish, brand: row.brand, budget: Number(row.budget) || 0, quotedPrice: Number(row.quotedPrice) || 0 };
+    const payload: SpecificationInput = { environment: row.environment, item: row.item, dimension: row.dimension, finish: row.finish, brand: row.brand, budget: Number(row.budget) || 0, quotedPrice: Number(row.quotedPrice) || 0, areaTotal: Number(row.areaTotal) || 0 };
     if (row.id.startsWith('draft-')) {
       createSpecification.mutate({ projectId: id, data: payload }, {
         onSuccess: (created) => {
@@ -769,13 +785,13 @@ function MatrixPage() {
     setNewSpecOpen(true);
   };
 
-  const createSpec = (input: { zone: Zone; category: string; environment: string; element: string; item: string; dimension: string; finish: string; brand: string; budget: number; quotedPrice: number; responsible: string }) => {
-    const draft: MatrixSpec = { id: `draft-${Date.now()}`, environment: input.environment || 'Novo ambiente', item: input.item || 'Novo item', dimension: input.dimension || '—', finish: input.finish || '—', brand: input.brand || 'A definir', budget: input.budget || 0, quotedPrice: input.quotedPrice || 0, element: input.element || 'Elemento', revision: 'R01', assignedTo: input.responsible || CURRENT_USER, status: 'pendente', zone: input.zone, updatedAt: new Date().toISOString() };
+  const createSpec = (input: { zone: Zone; category: string; environment: string; element: string; item: string; dimension: string; finish: string; brand: string; budget: number; quotedPrice: number; areaTotal: number; responsible: string }) => {
+    const draft: MatrixSpec = { id: `draft-${Date.now()}`, environment: input.environment || 'Novo ambiente', item: input.item || 'Novo item', dimension: input.dimension || '—', finish: input.finish || '—', brand: input.brand || 'A definir', budget: input.budget || 0, quotedPrice: input.quotedPrice || 0, areaTotal: input.areaTotal || 0, element: input.element || 'Elemento', revision: 'R01', assignedTo: input.responsible || CURRENT_USER, status: 'pendente', zone: input.zone, updatedAt: new Date().toISOString() };
     addSpecs(id, [draft]);
     setNewSpecOpen(false);
     if (input.zone !== zone) setZone(input.zone);
     pushActivity({ mark: 'MR', label: CURRENT_USER, action: 'cadastrou', target: draft.item, project: project.name, time: 'agora', tone: 'ink' });
-    const payload: SpecificationInput = { environment: draft.environment, item: draft.item, dimension: draft.dimension, finish: draft.finish, brand: draft.brand, budget: draft.budget, quotedPrice: draft.quotedPrice };
+    const payload: SpecificationInput = { environment: draft.environment, item: draft.item, dimension: draft.dimension, finish: draft.finish, brand: draft.brand, budget: draft.budget, quotedPrice: draft.quotedPrice, areaTotal: draft.areaTotal };
     createSpecification.mutate({ projectId: id, data: payload }, {
       onSuccess: (created) => {
         setSpec(id, { ...created, element: draft.element, revision: draft.revision, assignedTo: draft.assignedTo, status: draft.status, zone: draft.zone });
@@ -797,8 +813,8 @@ function MatrixPage() {
   const approvalSpec = useMemo(() => (approvalRequest?.projectId === id ? specs.find((spec) => spec.id === approvalRequest.specId) ?? null : null), [approvalRequest, id, specs]);
 
   const exportCSV = () => {
-    const rows = budgetFiltered.map((row) => [row.environment, row.zone, categoryFor(row), row.element, row.item, row.dimension, row.finish, row.brand, Number(row.budget) || 0, Number(row.quotedPrice) || 0]);
-    const header = ['Ambiente', 'Macrozona', 'Categoria', 'Elemento', 'Item', 'Dimensão', 'Acabamento', 'Marca', 'Verba (R$)', 'Cotado (R$)'];
+    const rows = budgetFiltered.map((row) => [row.environment, row.zone, categoryFor(row), row.element, row.item, row.dimension, row.finish, row.brand, Number(row.budget) || 0, Number(row.quotedPrice) || 0, specArea(row) || '', specTotalValue(row)]);
+    const header = ['Ambiente', 'Macrozona', 'Categoria', 'Elemento', 'Item', 'Dimensão', 'Acabamento', 'Marca', 'Verba (R$)', 'Custo Cotado (R$)', 'Área Total', 'Valor Total (R$)'];
     const csv = [header, ...rows].map((line) => line.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(';')).join('\n');
     const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -911,14 +927,27 @@ function EditableCell({ value, onChange, onCommit, numeric, testId }: { value: s
 
 function AutoTextarea({ value, onChange, onCommit, testId }: { value: string; onChange: (value: string) => void; onCommit: () => void; testId: string }) {
   const ref = useRef<HTMLTextAreaElement>(null);
-  const resize = () => {
+  const doResize = useCallback(() => {
     const el = ref.current;
     if (!el) return;
     el.style.height = 'auto';
     el.style.height = `${el.scrollHeight}px`;
-  };
-  useEffect(resize, [value]);
-  return <textarea ref={ref} rows={1} className="editable-cell item-input" value={value} onChange={(event) => onChange(event.target.value)} onInput={resize} onBlur={onCommit} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) event.currentTarget.blur(); }} data-testid={testId} />;
+  }, []);
+  useEffect(() => {
+    doResize();
+    const el = ref.current;
+    if (!el) return;
+    let lastWidth = el.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (el.clientWidth !== lastWidth) {
+        lastWidth = el.clientWidth;
+        doResize();
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [value, doResize]);
+  return <textarea ref={ref} rows={1} className="editable-cell item-input" value={value} onChange={(event) => onChange(event.target.value)} onInput={doResize} onBlur={onCommit} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) event.currentTarget.blur(); }} data-testid={testId} />;
 }
 
 function ElementGlyph({ element }: { element: string }) {
@@ -927,16 +956,16 @@ function ElementGlyph({ element }: { element: string }) {
 }
 
 function SpecificationTable({ groups, openCategories, onToggleCategory, onChange, onSave, onDelete, onRequestChange, onOpenApproval }: { groups: { category: string; rows: MatrixSpec[] }[]; openCategories: Record<string, boolean>; onToggleCategory: (category: string) => void; onChange: (row: MatrixSpec) => void; onSave: (row: MatrixSpec) => void; onDelete: (row: MatrixSpec) => void; onRequestChange: (row: MatrixSpec) => void; onOpenApproval: (row: MatrixSpec) => void }) {
-  const edit = (row: MatrixSpec, key: keyof MatrixSpec, value: string) => onChange({ ...row, [key]: key === 'budget' || key === 'quotedPrice' ? Number(value) : value });
+  const edit = (row: MatrixSpec, key: keyof MatrixSpec, value: string) => onChange({ ...row, [key]: key === 'budget' || key === 'quotedPrice' || key === 'areaTotal' ? Number(value) : value });
   const deltaLabel = (row: MatrixSpec) => {
-    const delta = Number(row.quotedPrice) - Number(row.budget);
+    const delta = specBudgetValue(row) - specTotalValue(row);
     if (delta > 0) return `+${BRL_NUM.format(delta)}`;
     if (delta < 0) return `−${BRL_NUM.format(-delta)}`;
     return '—';
   };
   const deltaClass = (row: MatrixSpec) => {
-    const delta = Number(row.quotedPrice) - Number(row.budget);
-    return delta > 0 ? 'delta-over' : delta < 0 ? 'delta-under' : 'delta-zero';
+    const delta = specBudgetValue(row) - specTotalValue(row);
+    return delta < 0 ? 'delta-over' : delta > 0 ? 'delta-under' : 'delta-zero';
   };
   const groupByEnvironment = (rows: MatrixSpec[]) => {
     const order: string[] = [];
@@ -951,9 +980,9 @@ function SpecificationTable({ groups, openCategories, onToggleCategory, onChange
     return order.map((environment) => ({ environment, rows: map.get(environment)! }));
   };
   const envTotals = (rows: MatrixSpec[]) => {
-    const budget = rows.reduce((sum, row) => sum + Number(row.budget || 0), 0);
-    const quoted = rows.reduce((sum, row) => sum + Number(row.quotedPrice || 0), 0);
-    return { budget, quoted, delta: quoted - budget };
+    const budget = rows.reduce((sum, row) => sum + specBudgetValue(row), 0);
+    const quoted = rows.reduce((sum, row) => sum + specTotalValue(row), 0);
+    return { budget, quoted, delta: budget - quoted };
   };
   return (
     <div className="table-frame">
@@ -961,28 +990,28 @@ function SpecificationTable({ groups, openCategories, onToggleCategory, onChange
         <div className="spec-head-row">
           <div className="head-env">Ambiente</div>
           <div className="head-rest">
-            <div>Elemento</div><div>Item / Descrição</div><div>Dimensão</div><div>Acabamento</div><div>Valor Previsto (R$)</div><div>Valor Cotado (R$)</div><div>Δ (R$)</div><div>Aprovação</div><div>Ações</div>
+            <div>Elemento</div><div>Item / Descrição</div><div>Dimensão</div><div>Acabamento</div><div>Valor Previsto (R$)</div><div>Custo Cotado (R$)</div><div>Área Total</div><div>Valor Total (R$)</div><div>Δ (R$)</div><div>Aprovação</div><div>Ações</div>
           </div>
         </div>
         {groups.map(({ category, rows }) => <Fragment key={category}>
           {(() => {
             const cat = envTotals(rows);
             return (
-              <button type="button" className="spec-category" onClick={() => onToggleCategory(category)} aria-expanded={openCategories[category]}><ChevronDown size={15} className={openCategories[category] ? '' : 'collapsed'} /><span>{category}</span><small><span className="cat-count">{rows.length} {rows.length === 1 ? 'item' : 'itens'}</span><span className="cat-budget">{money(cat.quoted)} <i>de</i> {money(cat.budget)}</span><span className={`delta-value ${cat.delta > 0 ? 'delta-over' : cat.delta < 0 ? 'delta-under' : 'delta-zero'}`}>{cat.delta === 0 ? '—' : `${cat.delta > 0 ? '+' : '−'}${BRL_NUM.format(Math.abs(cat.delta))}`}</span></small></button>
+              <button type="button" className="spec-category" onClick={() => onToggleCategory(category)} aria-expanded={openCategories[category]}><ChevronDown size={15} className={openCategories[category] ? '' : 'collapsed'} /><span>{category}</span><small><span className="cat-count">{rows.length} {rows.length === 1 ? 'item' : 'itens'}</span><span className="cat-budget">{money(cat.quoted)} <i>de</i> {money(cat.budget)}</span><span className={`delta-value ${cat.delta < 0 ? 'delta-over' : cat.delta > 0 ? 'delta-under' : 'delta-zero'}`}>{cat.delta === 0 ? '—' : `${cat.delta < 0 ? '−' : '+'}${BRL_NUM.format(Math.abs(cat.delta))}`}</span></small></button>
             );
           })()}
           {openCategories[category] && groupByEnvironment(rows).map(({ environment, rows: envRows }) => {
             const totals = envTotals(envRows);
             return (
               <div className="spec-env-block" key={environment}>
-                <div className={`env-cell ${totals.delta > 0 ? 'env-over' : 'env-under'}`}>
+                <div className={`env-cell ${totals.delta < 0 ? 'env-over' : 'env-under'}`}>
                   <strong>{environment}</strong>
                   <small>{envRows.length} {envRows.length === 1 ? 'item' : 'itens'}</small>
-                  <span className={`env-delta ${totals.delta > 0 ? 'delta-over' : totals.delta < 0 ? 'delta-under' : 'delta-zero'}`}>{totals.delta === 0 ? '—' : `${totals.delta > 0 ? '+' : '−'}${BRL_NUM.format(Math.abs(totals.delta))}`}</span>
+                  <span className={`env-delta ${totals.delta < 0 ? 'delta-over' : totals.delta > 0 ? 'delta-under' : 'delta-zero'}`}>{totals.delta === 0 ? '—' : `${totals.delta < 0 ? '−' : '+'}${BRL_NUM.format(Math.abs(totals.delta))}`}</span>
                 </div>
                 <div className="env-rows">
                   {envRows.map((row) => {
-                    const under = Number(row.quotedPrice) <= Number(row.budget);
+                    const under = specTotalValue(row) <= specBudgetValue(row);
                     const approved = row.status === 'aprovado';
                     return (
                       <div className="spec-row" role="row" key={row.id} data-testid={`row-spec-${row.id}`}>
@@ -992,6 +1021,8 @@ function SpecificationTable({ groups, openCategories, onToggleCategory, onChange
                         <div><EditableCell value={row.finish} onChange={(value) => edit(row, 'finish', value)} onCommit={() => onSave(row)} testId={`input-finish-${row.id}`} /></div>
                         <div><EditableCell value={row.budget} onChange={(value) => edit(row, 'budget', value)} onCommit={() => onSave(row)} numeric testId={`input-budget-${row.id}`} /></div>
                         <div><span className={`price-inline ${under ? 'price-under' : 'price-over'}`}><EditableCell value={row.quotedPrice} onChange={(value) => edit(row, 'quotedPrice', value)} onCommit={() => onSave(row)} numeric testId={`input-quoted-${row.id}`} /></span></div>
+                        <div><EditableCell value={row.areaTotal ?? ''} onChange={(value) => edit(row, 'areaTotal', value)} onCommit={() => onSave(row)} numeric testId={`input-area-${row.id}`} /></div>
+                        <div>{specArea(row) > 0 ? <span className="total-value price-inline"><strong>{money(specTotalValue(row))}</strong></span> : <span className="total-value-empty">—</span>}</div>
                         <div><span className={`delta-value ${deltaClass(row)}`}>{deltaLabel(row)}</span></div>
                         <div>{approved ? <Tooltip delayDuration={150}><TooltipTrigger asChild><span className="approve-icon ok" data-testid={`approve-ok-${row.id}`}><CheckCircle2 size={14} /></span></TooltipTrigger><TooltipContent side="right">Aprovado por {row.assignedTo}</TooltipContent></Tooltip> : <Tooltip delayDuration={150}><TooltipTrigger asChild><button type="button" className="approve-icon pending approve-action" title={`Revisar ${row.item}`} onClick={() => onOpenApproval(row)} data-testid={`button-approve-${row.id}`}><Clock size={14} /></button></TooltipTrigger><TooltipContent side="right">Revisar aprovação — responsável: {row.assignedTo}</TooltipContent></Tooltip>}</div>
                         <div className="row-actions"><IconButton label="Solicitar troca" className="change-icon" testId={`button-request-change-${row.id}`} onClick={() => onRequestChange(row)}><ArrowLeftRight size={14} /></IconButton>{row.id.startsWith('draft-') && <button type="button" className="save-row" onClick={() => onSave(row)} data-testid={`button-save-row-${row.id}`}><Check size={14} /></button>}<IconButton label={`Remover ${row.item}`} className="delete-row" testId={`button-delete-row-${row.id}`} onClick={() => onDelete(row)}><Trash2 size={14} /></IconButton></div>
@@ -1022,7 +1053,7 @@ function BudgetHealthPanel({ totalBudget, totalQuoted, overBudgetCount, linesCou
       </div>
       <div className="budget-health-metrics">
         <div className="health-metric"><span>CUSTO PREVISTO</span><strong className="health-budget">{money(totalBudget)}</strong><small>{linesCount} linhas mapeadas</small></div>
-        <div className="health-metric"><span>TOTAL COTADO</span><strong className="health-quoted">{money(totalQuoted)}</strong><small>soma dos preços atuais</small></div>
+        <div className="health-metric"><span>VALOR TOTAL (COTADO)</span><strong className="health-quoted">{money(totalQuoted)}</strong><small>soma dos valores totais</small></div>
         <div className="health-metric"><span>{over ? 'ESTOURO' : 'SALDO'}</span><strong className={`health-delta ${over ? 'over' : 'under'}`}>{over ? <AlertTriangle size={16} strokeWidth={2.5} /> : <CheckCircle2 size={16} strokeWidth={2.5} />}{over ? `−${money(delta)}` : `+${money(-delta)}`}</strong><small>{over ? 'compromete o orçamento' : 'folga disponível'}</small></div>
       </div>
     </section>
@@ -1139,12 +1170,12 @@ function ChangeRequestModal({ row, reason, responsible, onReasonChange, onRespon
   );
 }
 
-function NewSpecModal({ defaultZone, onClose, onSubmit }: { defaultZone: Zone; onClose: () => void; onSubmit: (input: { zone: Zone; category: string; environment: string; element: string; item: string; dimension: string; finish: string; brand: string; budget: number; quotedPrice: number; responsible: string }) => void }) {
+function NewSpecModal({ defaultZone, onClose, onSubmit }: { defaultZone: Zone; onClose: () => void; onSubmit: (input: { zone: Zone; category: string; environment: string; element: string; item: string; dimension: string; finish: string; brand: string; budget: number; quotedPrice: number; areaTotal: number; responsible: string }) => void }) {
   const { specsByProject } = useWorkspace();
-  const [form, setForm] = useState({ zone: defaultZone, category: 'Revestimentos', environment: '', element: '', item: '', dimension: '', finish: '', brand: '', budget: '', quotedPrice: '', responsible: CURRENT_USER });
+  const [form, setForm] = useState({ zone: defaultZone, category: 'Revestimentos', environment: '', element: '', item: '', dimension: '', finish: '', brand: '', budget: '', quotedPrice: '', areaTotal: '', responsible: CURRENT_USER });
   const set = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
   const valid = form.item.trim().length > 0;
-  const submit = () => onSubmit({ ...form, zone: form.zone as Zone, budget: Number(form.budget) || 0, quotedPrice: Number(form.quotedPrice) || 0 });
+  const submit = () => onSubmit({ ...form, zone: form.zone as Zone, budget: Number(form.budget) || 0, quotedPrice: Number(form.quotedPrice) || 0, areaTotal: Number(form.areaTotal) || 0 });
 
   const matchedProduct = useMemo(() => {
     const brand = form.brand.trim();
@@ -1166,6 +1197,7 @@ function NewSpecModal({ defaultZone, onClose, onSubmit }: { defaultZone: Zone; o
       dimension: matchedProduct.dimension || current.dimension,
       finish: matchedProduct.finish || current.finish,
       quotedPrice: matchedProduct.quotedPrice ? String(matchedProduct.quotedPrice) : current.quotedPrice,
+      areaTotal: matchedProduct.areaTotal ? String(matchedProduct.areaTotal) : current.areaTotal,
     }));
   }, [matchedProduct]);
 
@@ -1186,6 +1218,7 @@ function NewSpecModal({ defaultZone, onClose, onSubmit }: { defaultZone: Zone; o
           <label className="spec-form-field"><span>Responsável pela aprovação</span><select value={form.responsible} onChange={(event) => set('responsible', event.target.value)} data-testid="input-new-responsible"><option value="Marina Reis">Marina Reis</option><option value="Felipe">Felipe</option><option value="Lucas">Lucas</option><option value="André Ribeiro">André Ribeiro</option><option value="Carla Souza">Carla Souza</option></select></label>
           <label className="spec-form-field"><span>Verba prevista (R$)</span><input type="number" value={form.budget} onChange={(event) => set('budget', event.target.value)} placeholder="0,00" data-testid="input-new-budget" /></label>
           <label className="spec-form-field"><span>Preço cotado (R$)</span><input type="number" value={form.quotedPrice} onChange={(event) => set('quotedPrice', event.target.value)} placeholder="0,00" data-testid="input-new-quoted" /></label>
+          <label className="spec-form-field"><span>Área total (opcional)</span><input type="number" value={form.areaTotal} onChange={(event) => set('areaTotal', event.target.value)} placeholder="Ex: 38" data-testid="input-new-area" /></label>
         </div>
         <div className="modal-actions"><button type="button" className="button button-quiet" onClick={onClose}>Cancelar</button><button type="button" className="button button-primary" onClick={submit} disabled={!valid} data-testid="button-submit-new-spec">Adicionar à matriz</button></div>
       </div>

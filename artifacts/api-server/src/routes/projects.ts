@@ -17,6 +17,7 @@ type Specification = {
   brand: string;
   budget: number;
   quotedPrice: number;
+  areaTotal?: number;
   updatedAt: string;
 };
 
@@ -50,6 +51,7 @@ const projects: Project[] = [
         brand: "Portobello",
         budget: 120,
         quotedPrice: 105,
+        areaTotal: 38,
         updatedAt: now(),
       },
       {

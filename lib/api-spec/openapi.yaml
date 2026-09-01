@@ -172,6 +172,8 @@ components:
           type: number
         quotedPrice:
           type: number
+        areaTotal:
+          type: number
       required: [environment, item, dimension, finish, brand, budget, quotedPrice]
     Specification:
       allOf:
