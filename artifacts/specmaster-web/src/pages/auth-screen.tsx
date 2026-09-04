@@ -1,17 +1,19 @@
 import { useState, type ReactNode } from 'react';
-import { AlertCircle, AlertTriangle, Building2, Eye, EyeOff, FileSpreadsheet, HardHat, Lock, Mail, User, Users } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Building2, Eye, EyeOff, FileSpreadsheet, HardHat, Lock, Mail, ShieldCheck, User, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
-import { DEMO_EMAIL, DEMO_PASSWORD, useAuth, type AuthErrors, type SignupInput } from '@/auth-context';
+import { useAuth, type AuthErrors, type SignupInput } from '@/auth-context';
 
 type LoginValues = { email: string; password: string };
 type SignupValues = SignupInput;
 
 const EMPTY_LOGIN: LoginValues = { email: '', password: '' };
 const EMPTY_SIGNUP: SignupValues = { name: '', email: '', password: '', role: '', company: '' };
+
+const BASE_PATH = (import.meta.env.BASE_URL ?? '/').replace(/\/$/, '');
 
 function FieldError({ message, id }: { message?: string; id: string }) {
   if (!message) return null;
@@ -123,6 +125,15 @@ function Banner({ message }: { message?: string }) {
   );
 }
 
+function Notice({ message }: { message?: string }) {
+  if (!message) return null;
+  return (
+    <div className="flex items-start gap-2 rounded-md border border-primary/30 bg-primary/5 px-2.5 py-1.5 text-[11.5px] text-foreground">
+      <Mail className="size-3.5 shrink-0 mt-px text-primary" /> {message}
+    </div>
+  );
+}
+
 const FEATURES = [
   { icon: FileSpreadsheet, text: 'Importação de memoriais em PDF com extração instantânea.' },
   { icon: AlertTriangle, text: 'Alerta visual automático entre verba teto e valor cotado.' },
@@ -139,7 +150,8 @@ export default function AuthScreen() {
   const [signupErrors, setSignupErrors] = useState<AuthErrors>({});
   const [attempted, setAttempted] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<'login' | 'signup' | null>(null);
+  const [signupNotice, setSignupNotice] = useState('');
 
   const setLogin = (key: keyof LoginValues, value: string) => {
     setLoginValues((current) => ({ ...current, [key]: value }));
@@ -162,37 +174,51 @@ export default function AuthScreen() {
     setAttempted(false);
     setLoginErrors({});
     setSignupErrors({});
+    setSignupNotice('');
     setShowPassword(false);
   };
 
-  const submitLogin = () => {
+  const goToMatrix = () => {
+    window.history.replaceState(null, '', `${BASE_PATH}/matriz`);
+  };
+
+  const submitLogin = async () => {
     setAttempted(true);
     const errors = validateLogin(loginValues.email, loginValues.password);
     setLoginErrors(errors);
     if (Object.keys(errors).length > 0) return;
-    setBusy(true);
-    const result = login(loginValues.email, loginValues.password);
-    setBusy(false);
-    if (!result.ok && result.errors) setLoginErrors(result.errors);
+    setBusy('login');
+    const result = await login(loginValues.email, loginValues.password);
+    setBusy(null);
+    if (!result.ok) {
+      setLoginErrors(result.errors);
+      return;
+    }
+    goToMatrix();
   };
 
-  const submitSignup = () => {
+  const submitSignup = async () => {
     setAttempted(true);
     const errors = validateSignup(signupValues);
-    setSignupErrors(errors);
-    if (Object.keys(errors).length > 0) return;
-    setBusy(true);
-    const result = signup(signupValues);
-    setBusy(false);
-    if (!result.ok && result.errors) setSignupErrors(result.errors);
-  };
-
-  const quickDemo = () => {
-    setAttempted(true);
-    setLoginErrors({});
-    setLoginValues({ email: DEMO_EMAIL, password: DEMO_PASSWORD });
-    const result = login(DEMO_EMAIL, DEMO_PASSWORD);
-    if (!result.ok && result.errors) setLoginErrors(result.errors);
+    if (Object.keys(errors).length > 0) {
+      setSignupErrors(errors);
+      return;
+    }
+    setBusy('signup');
+    setSignupNotice('');
+    const result = await signup(signupValues);
+    setBusy(null);
+    if (!result.ok) {
+      setSignupErrors(result.errors);
+      return;
+    }
+    if (result.needsEmailConfirmation) {
+      setSignupNotice('Conta criada! Enviamos um link de confirmação para o seu e-mail. Confirme para ativar seu acesso.');
+      setSignupValues(EMPTY_SIGNUP);
+      setSignupErrors({});
+      return;
+    }
+    goToMatrix();
   };
 
   return (
@@ -252,8 +278,8 @@ export default function AuthScreen() {
                   <Field id="login-email" label="E-mail" type="email" autoComplete="email" placeholder="voce@empresa.com" icon={<Mail />} value={loginValues.email} onChange={(value) => setLogin('email', value)} error={loginErrors.email} />
                   <PasswordInput id="login-password" value={loginValues.password} onChange={(value) => setLogin('password', value)} show={showPassword} toggle={() => setShowPassword((current) => !current)} autoComplete="current-password" error={loginErrors.password} />
                   <Banner message={loginErrors.form} />
-                  <Button type="button" className="h-9 w-full" onClick={submitLogin} disabled={busy}>
-                    {busy ? 'Entrando…' : 'Entrar'}
+                  <Button type="button" className="h-9 w-full" onClick={submitLogin} disabled={busy === 'login'}>
+                    {busy === 'login' ? 'Entrando…' : 'Entrar'}
                   </Button>
                 </TabsContent>
 
@@ -270,20 +296,17 @@ export default function AuthScreen() {
                   </div>
                   <PasswordInput id="signup-password" value={signupValues.password} onChange={(value) => setSignup('password', value)} show={showPassword} toggle={() => setShowPassword((current) => !current)} autoComplete="new-password" error={signupErrors.password} />
                   <Banner message={signupErrors.form} />
-                  <Button type="button" className="h-9 w-full" onClick={submitSignup} disabled={busy}>
-                    {busy ? 'Criando conta…' : 'Criar conta'}
+                  <Notice message={signupNotice} />
+                  <Button type="button" className="h-9 w-full" onClick={submitSignup} disabled={busy === 'signup'}>
+                    {busy === 'signup' ? 'Criando conta…' : 'Criar conta'}
                   </Button>
                 </TabsContent>
               </Tabs>
             </div>
           </div>
 
-          <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 px-3.5 py-2.5">
-            <div className="min-w-0">
-              <p className="text-[12px] font-medium">Conta de demonstração</p>
-              <p className="truncate text-[11px] text-muted-foreground">{DEMO_EMAIL} · senha {DEMO_PASSWORD}</p>
-            </div>
-            <Button type="button" variant="outline" size="sm" className="h-8 shrink-0 px-3 text-[12px]" onClick={quickDemo}>Entrar como demo</Button>
+          <div className="mt-3 flex items-center justify-center gap-2 text-[11px] text-muted-foreground">
+            <ShieldCheck className="size-3.5 text-primary" /> Autenticação e dados seguros com Supabase
           </div>
         </div>
       </main>

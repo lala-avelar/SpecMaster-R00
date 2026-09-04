@@ -91,7 +91,8 @@ import {
   type MatrixSpec,
   type Zone,
 } from '@/workspace-store';
-import { AuthProvider, DEMO_EMAIL, initialsOf, useAuth } from '@/auth-context';
+import { AuthProvider, DEMO_EMAIL, useAuth } from '@/auth-context';
+import { initialsOf } from '@/supabase';
 import AuthScreen from '@/pages/auth-screen';
 
 const queryClient = new QueryClient();
@@ -401,8 +402,8 @@ function Shell({ children }: { children: ReactNode }) {
   const projects = effectiveProjects(Array.isArray(projectsQuery.data) && projectsQuery.data.length ? projectsQuery.data : demoBase, localProjects, hiddenProjects, projectNameOverrides);
   const activeProjectId = location.match(/^\/projects\/([^/]+)/)?.[1] ?? projects[0]?.id ?? 'ed-santa-monica';
   const activeProject = projects.find((project) => project.id === activeProjectId) ?? projects[0];
-  const isProject = location.startsWith('/projects/');
-  const matrixHref = projects[0] ? `/projects/${projects[0].id}` : '/';
+  const isProject = location.startsWith('/projects/') || location === '/matriz';
+  const matrixHref = projects[0] ? `/projects/${projects[0].id}` : '/matriz';
 
   const pushNotice = (message: string) => {
     setNotice(message);
@@ -1507,6 +1508,7 @@ function Router() {
       <Shell>
         <Switch>
           <Route path="/" component={Portfolio} />
+          <Route path="/matriz" component={MatrixPage} />
           <Route path="/projects/:projectId" component={MatrixPage} />
           <Route path="/suppliers" component={Suppliers} />
           <Route path="/settings"><EmptyPage type="settings" /></Route>
@@ -1534,7 +1536,19 @@ function AuthenticatedApp({ userKey, userName }: { userKey: string; userName: st
 }
 
 function AppGate() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  if (loading) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <div className="grid min-h-[100dvh] place-items-center bg-[#F6F5F2]">
+          <div className="flex flex-col items-center gap-3">
+            <span className="grid size-11 place-items-center rounded-xl bg-[#0B1E63] text-white"><HardHat size={22} /></span>
+            <span className="text-sm font-semibold tracking-tight text-[#0B1E63]">specmaster</span>
+          </div>
+        </div>
+      </QueryClientProvider>
+    );
+  }
   return (
     <QueryClientProvider client={queryClient}>
       {user ? <AuthenticatedApp userKey={user.id} userName={user.name} /> : <AuthScreen />}
