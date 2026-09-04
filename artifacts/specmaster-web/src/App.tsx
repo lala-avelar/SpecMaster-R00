@@ -49,6 +49,7 @@ import {
   Lightbulb,
   Link as LinkIcon,
   LoaderCircle,
+  LogOut,
   Minus,
   MoreHorizontal,
   PackageSearch,
@@ -90,6 +91,8 @@ import {
   type MatrixSpec,
   type Zone,
 } from '@/workspace-store';
+import { AuthProvider, DEMO_EMAIL, initialsOf, useAuth } from '@/auth-context';
+import AuthScreen from '@/pages/auth-screen';
 
 const queryClient = new QueryClient();
 
@@ -348,7 +351,7 @@ function parseCsvText(text: string): Record<string, unknown>[] {
   });
 }
 
-function parseWorkbookRows(rows: Record<string, unknown>[]): MatrixSpec[] {
+function parseWorkbookRows(rows: Record<string, unknown>[], currentUserName: string = CURRENT_USER): MatrixSpec[] {
   const headers = Object.keys(rows[0] ?? {});
   const map: Partial<Record<'environment' | 'element' | 'item' | 'dimension' | 'finish' | 'brand' | 'budget' | 'quotedPrice' | 'areaTotal' | 'zone', string>> = {};
   for (const header of headers) {
@@ -369,7 +372,7 @@ function parseWorkbookRows(rows: Record<string, unknown>[]): MatrixSpec[] {
       quotedPrice: parseMoney(row[map.quotedPrice ?? '']),
       areaTotal: map.areaTotal ? parseMoney(row[map.areaTotal ?? '']) : 0,
       revision: 'R01',
-      assignedTo: CURRENT_USER,
+      assignedTo: currentUserName,
       status: 'pendente',
       zone: map.zone ? normalizeZone(String(row[map.zone] ?? '')) : 'Apartamentos',
       updatedAt: new Date().toISOString(),
@@ -389,13 +392,17 @@ function Shell({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const [, setLocation] = useLocation();
   const [notice, setNotice] = useState('');
+  const { user, logout } = useAuth();
+  const me = user ?? { id: '', name: CURRENT_USER, initials: 'MR', email: '', role: 'Direção de projetos', company: 'Vale Norte', createdAt: '' };
   const health = useHealthCheck({ query: { queryKey: getHealthCheckQueryKey(), staleTime: 60000 } });
   const projectsQuery = useListProjects({ query: { queryKey: getListProjectsQueryKey(), staleTime: 30000 } });
-  const { localProjects, hiddenProjects, projectNameOverrides } = useWorkspace();
-  const projects = effectiveProjects(Array.isArray(projectsQuery.data) && projectsQuery.data.length ? projectsQuery.data : FALLBACK_PROJECTS, localProjects, hiddenProjects, projectNameOverrides);
-  const activeProjectId = location.match(/^\/projects\/([^/]+)/)?.[1] ?? 'ed-santa-monica';
+  const { sampleMode, localProjects, hiddenProjects, projectNameOverrides } = useWorkspace();
+  const demoBase = sampleMode ? FALLBACK_PROJECTS : [];
+  const projects = effectiveProjects(Array.isArray(projectsQuery.data) && projectsQuery.data.length ? projectsQuery.data : demoBase, localProjects, hiddenProjects, projectNameOverrides);
+  const activeProjectId = location.match(/^\/projects\/([^/]+)/)?.[1] ?? projects[0]?.id ?? 'ed-santa-monica';
   const activeProject = projects.find((project) => project.id === activeProjectId) ?? projects[0];
   const isProject = location.startsWith('/projects/');
+  const matrixHref = projects[0] ? `/projects/${projects[0].id}` : '/';
 
   const pushNotice = (message: string) => {
     setNotice(message);
@@ -409,18 +416,17 @@ function Shell({ children }: { children: ReactNode }) {
           <span className="brand-mark"><HardHat size={19} strokeWidth={2.4} /></span>
           <span><strong>spec</strong>master<em>®</em></span>
         </Link>
-        <div className="workspace-label">WORKSPACE <ChevronDown size={13} /></div>
+        <div className="workspace-label">WORKSPACE</div>
         <div className="workspace-switcher">
-          <span className="workspace-avatar">VN</span>
-          <span><strong>Vale Norte</strong><small>Equipe de especificação</small></span>
-          <MoreHorizontal size={16} />
+          <span className="workspace-avatar">{initialsOf(me.company)}</span>
+          <span><strong>{me.company}</strong><small>{me.role}</small></span>
         </div>
         <nav className="side-nav" aria-label="Navegação principal">
           <p className="nav-caption">Controle</p>
           <Link href="/" className={`nav-item ${location === '/' ? 'active' : ''}`} data-testid="link-nav-portfolio">
             <LayoutDashboard size={17} /><span>Portfólio</span><kbd>1</kbd>
           </Link>
-          <Link href="/projects/ed-santa-monica" className={`nav-item ${isProject ? 'active' : ''}`} data-testid="link-nav-matrix">
+          <Link href={matrixHref} className={`nav-item ${isProject ? 'active' : ''}`} data-testid="link-nav-matrix">
             <ClipboardList size={17} /><span>Matriz de specs</span>
           </Link>
           <Link href="/suppliers" className={`nav-item ${location === '/suppliers' ? 'active' : ''}`} data-testid="link-nav-suppliers">
@@ -433,6 +439,9 @@ function Shell({ children }: { children: ReactNode }) {
           <button type="button" onClick={() => pushNotice('Central de ajuda disponível em breve.')} className="nav-item nav-button" data-testid="button-help">
             <CircleHelp size={17} /><span>Central de ajuda</span>
           </button>
+          <button type="button" onClick={logout} className="nav-item nav-button" data-testid="button-logout">
+            <LogOut size={17} /><span>Sair</span>
+          </button>
         </nav>
         <div className="sidebar-footer">
           <div className="system-status">
@@ -441,8 +450,8 @@ function Shell({ children }: { children: ReactNode }) {
             <span className="font-mono-ui status-time">09:41</span>
           </div>
           <div className="profile-row">
-            <span className="profile-avatar">MR</span>
-            <span><strong>Marina Reis</strong><small>Direção de projetos</small></span>
+            <span className="profile-avatar">{me.initials}</span>
+            <span><strong>{me.name}</strong><small>{me.role}</small></span>
             <MoreHorizontal size={16} />
           </div>
         </div>
@@ -450,7 +459,7 @@ function Shell({ children }: { children: ReactNode }) {
       <main className="main-canvas">
         <div className="project-switcher-bar" data-testid="project-switcher">
            <div className="project-switcher-main"><span className="breadcrumb-link">Projetos</span><span className="breadcrumb-separator">›</span><label className="project-select-wrap"><span className="sr-only">Selecionar projeto</span><select value={activeProject?.id ?? 'ed-santa-monica'} onChange={(event) => setLocation(`/projects/${event.target.value}`)} data-testid="select-project-switcher">{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select><ChevronDown size={14} /></label></div>
-           <div className="header-toolbar"><span className="sync-badge"><span className="status-dot" /> Sincronizado</span><span className="header-profile"><span className="profile-avatar">MR</span><strong>Marina Reis</strong></span></div>
+           <div className="header-toolbar"><span className="sync-badge"><span className="status-dot" /> Sincronizado</span><span className="header-profile"><span className="profile-avatar">{me.initials}</span><span className="header-profile-id"><strong>{me.name}</strong><small>{me.role}</small></span></span></div>
         </div>
         {children}
       </main>
@@ -480,14 +489,17 @@ function Topbar({ eyebrow, title, action }: { eyebrow: string; title: string; ac
 }
 
 function Portfolio() {
+  const { user: authUser } = useAuth();
+  const meName = authUser?.name ?? CURRENT_USER;
   const projectsQuery = useListProjects({ query: { queryKey: getListProjectsQueryKey(), staleTime: 30000 } });
-  const { specsByProject, requestApproval, activity, localProjects, hiddenProjects, projectNameOverrides, createProject, setAutoImportProjectId, renameProject, deleteProject } = useWorkspace();
-  const projects = effectiveProjects(Array.isArray(projectsQuery.data) && projectsQuery.data.length ? projectsQuery.data : FALLBACK_PROJECTS, localProjects, hiddenProjects, projectNameOverrides);
+  const { sampleMode, adoptExample, specsByProject, requestApproval, activity, localProjects, hiddenProjects, projectNameOverrides, createProject, setAutoImportProjectId, renameProject, deleteProject } = useWorkspace();
+  const demoBase = sampleMode ? FALLBACK_PROJECTS : [];
+  const projects = effectiveProjects(Array.isArray(projectsQuery.data) && projectsQuery.data.length ? projectsQuery.data : demoBase, localProjects, hiddenProjects, projectNameOverrides);
   const projectCount = projects.length;
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [, setLocation] = useLocation();
   const projectName = (projectId: string) => projects.find((project) => project.id === projectId)?.name ?? projectId;
-  const myPending = useMemo(() => Object.entries(specsByProject).flatMap(([projectId, list]) => list.filter((spec) => spec.assignedTo === CURRENT_USER && isPending(spec)).map((spec) => ({ ...spec, projectId }))), [specsByProject]);
+  const myPending = useMemo(() => Object.entries(specsByProject).flatMap(([projectId, list]) => list.filter((spec) => spec.assignedTo === meName && isPending(spec)).map((spec) => ({ ...spec, projectId }))), [specsByProject, meName]);
   const openPending = (projectId: string, spec: MatrixSpec) => {
     requestApproval(projectId, spec.id);
     setLocation(`/projects/${projectId}`);
@@ -543,18 +555,33 @@ function Portfolio() {
           <div><p className="section-kicker">EM ANDAMENTO</p><h3>Projetos ativos</h3></div>
           <span className="muted-label">Atualizado hoje, 09:38</span>
         </div>
-        <div className="project-grid">
-          {projects.map((project, index) => (
-            <ProjectCard project={project} completion={completionOf(project.id)} budgetInfo={budgetOf(project.id)} index={index} onRename={setRenameTarget} onDelete={confirmDelete} key={project.id} />
-          ))}
-          {!projectsQuery.data && projectsQuery.isLoading && <ProjectSkeleton />}
-        </div>
-        {projectsQuery.isError && <div className="query-note" data-testid="status-projects-error">Exibindo a última fotografia salva. <button type="button" onClick={() => projectsQuery.refetch()} data-testid="button-retry-projects">Tentar novamente</button></div>}
+        {projects.length === 0 && !projectsQuery.isLoading ? (
+          <div className="portfolio-onboarding" data-testid="onboarding-empty">
+            <div className="onboarding-mark"><FolderKanban size={22} /></div>
+            <p className="section-kicker">COMEÇANDO SEU PORTFÓLIO</p>
+            <h3 className="onboarding-title">Este é o seu espaço de projetos</h3>
+            <p className="onboarding-copy">Crie seu primeiro projeto e monte a matriz de especificações do seu jeito — com as marcas, verbas e cotações reais da sua obra. Ou explore um exemplo pronto para entender as possibilidades.</p>
+            <div className="onboarding-actions">
+              <button type="button" className="button button-primary" onClick={() => setNewProjectOpen(true)} data-testid="button-onboarding-create"><Plus size={15} /> Criar meu primeiro projeto</button>
+              <button type="button" className="button button-quiet" onClick={() => { adoptExample(); setLocation('/projects/casa-serra'); }} data-testid="button-onboarding-example">Começar com um projeto de exemplo <ArrowUpRight size={14} /></button>
+            </div>
+            <span className="onboarding-hint"><Lightbulb size={13} /> Você pode importar uma planilha (.xlsx ou .csv) ao criar o projeto.</span>
+          </div>
+        ) : (
+          <div className="project-grid">
+            {projects.map((project, index) => (
+              <ProjectCard project={project} completion={completionOf(project.id)} budgetInfo={budgetOf(project.id)} index={index} onRename={setRenameTarget} onDelete={confirmDelete} key={project.id} />
+            ))}
+            {!projectsQuery.data && projectsQuery.isLoading && <ProjectSkeleton />}
+          </div>
+        )}
+        {projectCount > 0 && projectsQuery.isError && <div className="query-note" data-testid="status-projects-error">Exibindo a última fotografia salva. <button type="button" onClick={() => projectsQuery.refetch()} data-testid="button-retry-projects">Tentar novamente</button></div>}
       </section>
+      {projectCount > 0 && (<>
       <section className="pending-panel stagger-3" data-testid="my-pending-panel">
         <div className="section-heading">
           <div><p className="section-kicker">APROVAÇÕES E REVISÕES</p><h3>Suas pendências {myPending.length > 0 && <span className="pending-count-badge">{myPending.length}</span>}</h3></div>
-          <span className="muted-label">Atribuídas a {CURRENT_USER}</span>
+          <span className="muted-label">Atribuídas a {meName}</span>
         </div>
         {myPending.length === 0 ? (
           <div className="pending-empty"><CheckCircle2 size={18} /> Nenhuma pendência sua. Tudo em dia!</div>
@@ -564,7 +591,8 @@ function Portfolio() {
               <div className="pending-item" key={`${spec.projectId}-${spec.id}`} onClick={() => openPending(spec.projectId, spec)} role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter') openPending(spec.projectId, spec); }} data-testid={`pending-item-${spec.id}`}>
                 <span className={`activity-avatar ${spec.status === 'troca' ? 'amber' : 'ink'}`}>{spec.assignedTo.split(' ').map((part) => part[0]).join('')}</span>
                 <div className="pending-main">
-                  <p><strong>{spec.item}</strong><small>{spec.environment} · {spec.zone}</small></p>
+                  <p className="pending-title"><strong>{spec.item}</strong></p>
+                  <span className="pending-meta"><span>{spec.environment}</span><i aria-hidden="true" /><span>{spec.zone}</span></span>
                   <span className="pending-project">{projectName(spec.projectId)}</span>
                 </div>
                 <span className={`pending-status ${spec.status}`}>{statusLabel(spec.status)}</span>
@@ -584,6 +612,7 @@ function Portfolio() {
           ))}
         </div>
       </section>
+      </>)}
       {newProjectOpen && <NewProjectModal onClose={() => setNewProjectOpen(false)} onCreate={onCreateProject} />}
       {renameTarget && <RenameProjectModal project={renameTarget} onClose={() => setRenameTarget(null)} onSave={confirmRename} />}
       {notice && <div className="toast-note page-enter" role="status" data-testid="status-portfolio-toast"><Check size={15} /> {notice}</div>}
@@ -654,14 +683,19 @@ function ActivityItem({ mark, label, action, target, project, time, tone }: { ma
 }
 
 function MatrixPage() {
+  const { user: authUser } = useAuth();
+  const meName = authUser?.name ?? CURRENT_USER;
+  const meInitials = authUser?.initials ?? 'MR';
   const { projectId } = useParams<{ projectId?: string }>();
-  const id = projectId || 'ed-santa-monica';
-  const projectQuery = useGetProject(id, { query: { queryKey: getGetProjectQueryKey(id), staleTime: 15000 } });
+  const { sampleMode, specsByProject, activity, approvalRequest, dismissApproval, requestApproval, localProjects, autoImportProjectId, setAutoImportProjectId, projectNameOverrides, setSpec, addSpecs, removeSpec, seedProject, approveSpec, requestChange, pushActivity, finalizeDraft } = useWorkspace();
+  const requestedId = projectId;
+  const ownsRequested = Boolean(requestedId) && (sampleMode || localProjects.some((project) => project.id === requestedId));
+  const id = ownsRequested ? requestedId! : sampleMode ? 'ed-santa-monica' : (localProjects[0]?.id ?? '');
+  const projectQuery = useGetProject(id || 'ed-santa-monica', { query: { queryKey: getGetProjectQueryKey(id || 'ed-santa-monica'), staleTime: 15000 } });
   const createSpecification = useCreateSpecification();
   const updateSpecification = useUpdateSpecification();
   const deleteSpecification = useDeleteSpecification();
   const queryClient = useQueryClient();
-  const { specsByProject, activity, approvalRequest, dismissApproval, requestApproval, localProjects, autoImportProjectId, setAutoImportProjectId, projectNameOverrides, setSpec, addSpecs, removeSpec, seedProject, approveSpec, requestChange, pushActivity } = useWorkspace();
   const [overBudgetOnly, setOverBudgetOnly] = useState(false);
   const [approvalFilter, setApprovalFilter] = useState<'all' | 'pending' | 'approved'>('all');
   const [myPendingOnly, setMyPendingOnly] = useState(false);
@@ -704,7 +738,7 @@ function MatrixPage() {
         ...row,
         element: 'Elemento',
         revision: 'R01',
-        assignedTo: CURRENT_USER,
+        assignedTo: meName,
         status: 'pendente',
         zone: 'Apartamentos',
       })));
@@ -720,12 +754,12 @@ function MatrixPage() {
     'Áreas Comuns': specs.filter((row) => row.zone === 'Áreas Comuns').length,
     'Fachada': specs.filter((row) => row.zone === 'Fachada').length,
   }), [specs]);
-  const myPendingCount = useMemo(() => specs.filter((row) => row.assignedTo === CURRENT_USER && isPending(row)).length, [specs]);
+  const myPendingCount = useMemo(() => specs.filter((row) => row.assignedTo === meName && isPending(row)).length, [specs, meName]);
   const filtered = useMemo(() => zoneSpecs.filter((row) => [row.environment, row.element, row.item, row.dimension, row.finish, row.brand].join(' ').toLowerCase().includes(search.toLowerCase())), [zoneSpecs, search]);
   const budgetFiltered = useMemo(() => {
     let rows = filtered;
     if (overBudgetOnly) rows = rows.filter(isOverBudget);
-    if (myPendingOnly) rows = rows.filter((row) => row.assignedTo === CURRENT_USER && isPending(row));
+    if (myPendingOnly) rows = rows.filter((row) => row.assignedTo === meName && isPending(row));
     if (approvalFilter === 'pending') rows = rows.filter(isPending);
     if (approvalFilter === 'approved') rows = rows.filter((row) => !isPending(row));
     if (elementFilter) rows = rows.filter((row) => row.element.toLowerCase().includes(elementFilter.toLowerCase()));
@@ -767,7 +801,10 @@ function MatrixPage() {
           queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(id) });
           pushNotice('Item adicionado à matriz.');
         },
-        onError: () => pushNotice('Não foi possível adicionar agora. A linha continua editável.'),
+        onError: () => {
+          finalizeDraft(id, row);
+          pushNotice('Linha salva localmente.');
+        },
       });
     } else {
       updateSpecification.mutate({ projectId: id, specificationId: row.id, data: payload }, {
@@ -786,11 +823,11 @@ function MatrixPage() {
   };
 
   const createSpec = (input: { zone: Zone; category: string; environment: string; element: string; item: string; dimension: string; finish: string; brand: string; budget: number; quotedPrice: number; areaTotal: number; responsible: string }) => {
-    const draft: MatrixSpec = { id: `draft-${Date.now()}`, environment: input.environment || 'Novo ambiente', item: input.item || 'Novo item', dimension: input.dimension || '—', finish: input.finish || '—', brand: input.brand || 'A definir', budget: input.budget || 0, quotedPrice: input.quotedPrice || 0, areaTotal: input.areaTotal || 0, element: input.element || 'Elemento', revision: 'R01', assignedTo: input.responsible || CURRENT_USER, status: 'pendente', zone: input.zone, updatedAt: new Date().toISOString() };
+    const draft: MatrixSpec = { id: `draft-${Date.now()}`, environment: input.environment || 'Novo ambiente', item: input.item || 'Novo item', dimension: input.dimension || '—', finish: input.finish || '—', brand: input.brand || 'A definir', budget: input.budget || 0, quotedPrice: input.quotedPrice || 0, areaTotal: input.areaTotal || 0, element: input.element || 'Elemento', revision: 'R01', assignedTo: input.responsible || meName, status: 'pendente', zone: input.zone, updatedAt: new Date().toISOString() };
     addSpecs(id, [draft]);
     setNewSpecOpen(false);
     if (input.zone !== zone) setZone(input.zone);
-    pushActivity({ mark: 'MR', label: CURRENT_USER, action: 'cadastrou', target: draft.item, project: project.name, time: 'agora', tone: 'ink' });
+    pushActivity({ mark: meInitials, label: meName, action: 'cadastrou', target: draft.item, project: project.name, time: 'agora', tone: 'ink' });
     const payload: SpecificationInput = { environment: draft.environment, item: draft.item, dimension: draft.dimension, finish: draft.finish, brand: draft.brand, budget: draft.budget, quotedPrice: draft.quotedPrice, areaTotal: draft.areaTotal };
     createSpecification.mutate({ projectId: id, data: payload }, {
       onSuccess: (created) => {
@@ -798,13 +835,16 @@ function MatrixPage() {
         queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(id) });
         pushNotice('Especificação cadastrada.');
       },
-      onError: () => pushNotice('Item salvo localmente; a sincronização será feita depois.'),
+      onError: () => {
+        finalizeDraft(id, draft);
+        pushNotice('Linha salva localmente.');
+      },
     });
   };
 
   const approveRow = (row: MatrixSpec) => {
     approveSpec(id, row.id);
-    pushActivity({ mark: 'MR', label: CURRENT_USER, action: 'aprovou', target: row.item, project: project.name, time: 'agora', tone: 'ink' });
+    pushActivity({ mark: meInitials, label: meName, action: 'aprovou', target: row.item, project: project.name, time: 'agora', tone: 'ink' });
     dismissApproval();
     pushNotice(`"${row.item}" aprovado.`);
   };
@@ -846,7 +886,7 @@ function MatrixPage() {
 
   const importRows = (rows: MatrixSpec[]) => {
     addSpecs(id, rows);
-    pushActivity({ mark: 'MR', label: CURRENT_USER, action: 'importou', target: `${rows.length} ${rows.length === 1 ? 'item' : 'itens'} de planilha`, project: project.name, time: 'agora', tone: 'coral' });
+    pushActivity({ mark: meInitials, label: meName, action: 'importou', target: `${rows.length} ${rows.length === 1 ? 'item' : 'itens'} de planilha`, project: project.name, time: 'agora', tone: 'coral' });
     pushNotice(`${rows.length} ${rows.length === 1 ? 'item' : 'itens'} importados para revisão.`);
   };
 
@@ -857,6 +897,22 @@ function MatrixPage() {
     window.setTimeout(() => setShareState(false), 2400);
   };
 
+  if (!id) {
+    return (
+      <div className="page-wrap matrix-page page-enter">
+        <div className="matrix-breadcrumb"><Link href="/" data-testid="link-back-portfolio"><ArrowLeft size={14} /> Portfólio</Link></div>
+        <div className="useful-empty matrix-empty-gate">
+          <div className="empty-orbit"><div className="orbit-ring ring-one" /><div className="orbit-ring ring-two" /><FolderKanban size={34} /></div>
+          <p className="section-kicker">MATRIZ DE ESPECIFICAÇÕES</p>
+          <h2>Você ainda não tem projetos.</h2>
+          <p>Crie seu primeiro projeto no portfólio para começar a montar a matriz de especificações com as marcas, verbas e cotações da sua obra.</p>
+          <div className="empty-actions">
+            <Link href="/" className="button button-primary" data-testid="link-gate-portfolio"><Plus size={15} /> Criar projeto no portfólio</Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
   if (projectQuery.isLoading && !projectQuery.data && !(specsByProject[id]?.length)) return <MatrixSkeleton />;
 
   return (
@@ -913,10 +969,10 @@ function MatrixPage() {
       <footer className="matrix-footer"><span><span className="legend-dot green" /> Dentro da verba <span className="legend-dot red" /> Acima da verba</span><span className="font-mono-ui">{budgetFiltered.length} itens visíveis · Última sincronização 09:38:12</span></footer>
       <MatrixActivity entries={activity.filter((entry) => entry.project === project.name)} projectName={project.name} />
       {notice && <div className="toast-note page-enter" role="status" data-testid="status-matrix-toast"><Check size={15} /> {notice}</div>}
-      {importOpen && <ImportModal onClose={() => setImportOpen(false)} onImport={importRows} />}
-      {newSpecOpen && <NewSpecModal defaultZone={zone} onClose={() => setNewSpecOpen(false)} onSubmit={createSpec} />}
+      {importOpen && <ImportModal currentUser={meName} onClose={() => setImportOpen(false)} onImport={importRows} />}
+      {newSpecOpen && <NewSpecModal defaultResponsible={meName} defaultZone={zone} onClose={() => setNewSpecOpen(false)} onSubmit={createSpec} />}
       {approvalSpec && <ApprovalModal spec={approvalSpec} projectName={project.name} onClose={dismissApproval} onApprove={approveRow} />}
-      {changeRequest && <ChangeRequestModal row={changeRequest} reason={changeReason} responsible={changeResponsible} onReasonChange={setChangeReason} onResponsibleChange={setChangeResponsible} onClose={() => { setChangeRequest(null); setChangeReason(''); }} onSubmit={() => { const row = changeRequest; setChangeRequest(null); setChangeReason(''); requestChange(id, row.id, changeResponsible); pushActivity({ mark: 'MR', label: CURRENT_USER, action: 'solicitou troca em', target: row.item, project: project.name, time: 'agora', tone: 'amber' }); pushNotice(`Solicitação de troca enviada para ${changeResponsible}.`); }} />}
+      {changeRequest && <ChangeRequestModal row={changeRequest} reason={changeReason} responsible={changeResponsible} onReasonChange={setChangeReason} onResponsibleChange={setChangeResponsible} onClose={() => { setChangeRequest(null); setChangeReason(''); }} onSubmit={() => { const row = changeRequest; setChangeRequest(null); setChangeReason(''); requestChange(id, row.id, changeResponsible); pushActivity({ mark: meInitials, label: meName, action: 'solicitou troca em', target: row.item, project: project.name, time: 'agora', tone: 'amber' }); pushNotice(`Solicitação de troca enviada para ${changeResponsible}.`); }} />}
     </div>
   );
 }
@@ -1025,7 +1081,7 @@ function SpecificationTable({ groups, openCategories, onToggleCategory, onChange
                         <div>{specArea(row) > 0 ? <span className="total-value price-inline"><strong>{money(specTotalValue(row))}</strong></span> : <span className="total-value-empty">—</span>}</div>
                         <div><span className={`delta-value ${deltaClass(row)}`}>{deltaLabel(row)}</span></div>
                         <div>{approved ? <Tooltip delayDuration={150}><TooltipTrigger asChild><span className="approve-icon ok" data-testid={`approve-ok-${row.id}`}><CheckCircle2 size={14} /></span></TooltipTrigger><TooltipContent side="right">Aprovado por {row.assignedTo}</TooltipContent></Tooltip> : <Tooltip delayDuration={150}><TooltipTrigger asChild><button type="button" className="approve-icon pending approve-action" title={`Revisar ${row.item}`} onClick={() => onOpenApproval(row)} data-testid={`button-approve-${row.id}`}><Clock size={14} /></button></TooltipTrigger><TooltipContent side="right">Revisar aprovação — responsável: {row.assignedTo}</TooltipContent></Tooltip>}</div>
-                        <div className="row-actions"><IconButton label="Solicitar troca" className="change-icon" testId={`button-request-change-${row.id}`} onClick={() => onRequestChange(row)}><ArrowLeftRight size={14} /></IconButton>{row.id.startsWith('draft-') && <button type="button" className="save-row" onClick={() => onSave(row)} data-testid={`button-save-row-${row.id}`}><Check size={14} /></button>}<IconButton label={`Remover ${row.item}`} className="delete-row" testId={`button-delete-row-${row.id}`} onClick={() => onDelete(row)}><Trash2 size={14} /></IconButton></div>
+                        <div className="row-actions"><IconButton label="Solicitar troca" className="change-icon" testId={`button-request-change-${row.id}`} onClick={() => onRequestChange(row)}><ArrowLeftRight size={14} /></IconButton>{row.id.startsWith('draft-') && <Tooltip delayDuration={150}><TooltipTrigger asChild><button type="button" className="save-row save-row-action" title="Salvar linha na matriz" onClick={() => onSave(row)} data-testid={`button-save-row-${row.id}`}><Check size={14} /></button></TooltipTrigger><TooltipContent side="right">Salvar esta linha na matriz</TooltipContent></Tooltip>}<IconButton label={`Remover ${row.item}`} className="delete-row" testId={`button-delete-row-${row.id}`} onClick={() => onDelete(row)}><Trash2 size={14} /></IconButton></div>
                       </div>
                     );
                   })}
@@ -1080,7 +1136,7 @@ function ModalShell({ children }: { children: ReactNode }) {
   return createPortal(<div className="modal-backdrop" role="presentation">{children}</div>, document.body);
 }
 
-function ImportModal({ onClose, onImport }: { onClose: () => void; onImport: (rows: MatrixSpec[]) => void }) {
+function ImportModal({ currentUser = CURRENT_USER, onClose, onImport }: { currentUser?: string; onClose: () => void; onImport: (rows: MatrixSpec[]) => void }) {
   const [rows, setRows] = useState<MatrixSpec[] | null>(null);
   const [fileName, setFileName] = useState('');
   const [error, setError] = useState('');
@@ -1100,7 +1156,7 @@ function ImportModal({ onClose, onImport }: { onClose: () => void; onImport: (ro
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         jsonRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
       }
-      const parsed = parseWorkbookRows(jsonRows);
+      const parsed = parseWorkbookRows(jsonRows, currentUser);
       if (!parsed.length) {
         setError('A planilha parece estar vazia.');
         return;
@@ -1170,11 +1226,15 @@ function ChangeRequestModal({ row, reason, responsible, onReasonChange, onRespon
   );
 }
 
-function NewSpecModal({ defaultZone, onClose, onSubmit }: { defaultZone: Zone; onClose: () => void; onSubmit: (input: { zone: Zone; category: string; environment: string; element: string; item: string; dimension: string; finish: string; brand: string; budget: number; quotedPrice: number; areaTotal: number; responsible: string }) => void }) {
+function NewSpecModal({ defaultResponsible = CURRENT_USER, defaultZone, onClose, onSubmit }: { defaultResponsible?: string; defaultZone: Zone; onClose: () => void; onSubmit: (input: { zone: Zone; category: string; environment: string; element: string; item: string; dimension: string; finish: string; brand: string; budget: number; quotedPrice: number; areaTotal: number; responsible: string }) => void }) {
   const { specsByProject } = useWorkspace();
-  const [form, setForm] = useState({ zone: defaultZone, category: 'Revestimentos', environment: '', element: '', item: '', dimension: '', finish: '', brand: '', budget: '', quotedPrice: '', areaTotal: '', responsible: CURRENT_USER });
+  const [form, setForm] = useState({ zone: defaultZone, category: 'Revestimentos', environment: '', element: '', item: '', dimension: '', finish: '', brand: '', budget: '', quotedPrice: '', areaTotal: '', responsible: defaultResponsible });
+  const elementOptions = useMemo(() => {
+    const used = Object.values(specsByProject).flat().map((row) => row.element).filter((value): value is string => Boolean(value && value.trim()));
+    return Array.from(new Set([...used, ...Object.keys(ELEMENT_ICONS)]));
+  }, [specsByProject]);
   const set = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
-  const valid = form.item.trim().length > 0;
+  const valid = form.item.trim().length > 0 && form.element.trim().length > 0;
   const submit = () => onSubmit({ ...form, zone: form.zone as Zone, budget: Number(form.budget) || 0, quotedPrice: Number(form.quotedPrice) || 0, areaTotal: Number(form.areaTotal) || 0 });
 
   const matchedProduct = useMemo(() => {
@@ -1210,12 +1270,12 @@ function NewSpecModal({ defaultZone, onClose, onSubmit }: { defaultZone: Zone; o
           <label className="spec-form-field"><span>Macrozona</span><select value={form.zone} onChange={(event) => set('zone', event.target.value)} data-testid="input-new-zone"><option value="Apartamentos">Apartamentos</option><option value="Áreas Comuns">Áreas Comuns</option><option value="Fachada">Fachada</option></select></label>
           <label className="spec-form-field"><span>Categoria</span><select value={form.category} onChange={(event) => set('category', event.target.value)} data-testid="input-new-category"><option>Revestimentos</option><option>Louças e Metais</option><option>Complementares</option></select></label>
           <label className="spec-form-field"><span>Ambiente</span><input value={form.environment} onChange={(event) => set('environment', event.target.value)} placeholder="Ex: Cozinha" data-testid="input-new-environment" /></label>
-          <label className="spec-form-field"><span>Elemento</span><input value={form.element} onChange={(event) => set('element', event.target.value)} placeholder="Ex: Piso, Torneira" data-testid="input-new-element" /></label>
+          <label className="spec-form-field"><span>Elemento</span><select value={form.element} onChange={(event) => set('element', event.target.value)} data-testid="input-new-element"><option value="" disabled>Selecione um elemento</option>{elementOptions.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
           <label className="spec-form-field"><span>Item / Descrição *</span><input value={form.item} onChange={(event) => set('item', event.target.value)} placeholder="Ex: Porcelanato Bianco Covelano" data-testid="input-new-item" /></label>
           <label className="spec-form-field"><span>Dimensão</span><input value={form.dimension} onChange={(event) => set('dimension', event.target.value)} placeholder="Ex: 90x90 cm" data-testid="input-new-dimension" /></label>
           <label className="spec-form-field"><span>Acabamento</span><input value={form.finish} onChange={(event) => set('finish', event.target.value)} placeholder="Ex: Nat. Retificado" data-testid="input-new-finish" /></label>
           <label className="spec-form-field"><span>Marca / Fornecedor</span><input value={form.brand} onChange={(event) => set('brand', event.target.value)} placeholder="Ex: Portobello" data-testid="input-new-brand" /></label>
-          <label className="spec-form-field"><span>Responsável pela aprovação</span><select value={form.responsible} onChange={(event) => set('responsible', event.target.value)} data-testid="input-new-responsible"><option value="Marina Reis">Marina Reis</option><option value="Felipe">Felipe</option><option value="Lucas">Lucas</option><option value="André Ribeiro">André Ribeiro</option><option value="Carla Souza">Carla Souza</option></select></label>
+          <label className="spec-form-field"><span>Responsável pela aprovação</span><select value={form.responsible} onChange={(event) => set('responsible', event.target.value)} data-testid="input-new-responsible">{!['Marina Reis', 'Felipe', 'Lucas', 'André Ribeiro', 'Carla Souza'].includes(defaultResponsible) && <option value={defaultResponsible}>{defaultResponsible}</option>}<option value="Marina Reis">Marina Reis</option><option value="Felipe">Felipe</option><option value="Lucas">Lucas</option><option value="André Ribeiro">André Ribeiro</option><option value="Carla Souza">Carla Souza</option></select></label>
           <label className="spec-form-field"><span>Verba prevista (R$)</span><input type="number" value={form.budget} onChange={(event) => set('budget', event.target.value)} placeholder="0,00" data-testid="input-new-budget" /></label>
           <label className="spec-form-field"><span>Preço cotado (R$)</span><input type="number" value={form.quotedPrice} onChange={(event) => set('quotedPrice', event.target.value)} placeholder="0,00" data-testid="input-new-quoted" /></label>
           <label className="spec-form-field"><span>Área total (opcional)</span><input type="number" value={form.areaTotal} onChange={(event) => set('areaTotal', event.target.value)} placeholder="Ex: 38" data-testid="input-new-area" /></label>
@@ -1457,18 +1517,36 @@ function Router() {
   );
 }
 
-function App() {
+function AuthenticatedApp({ userKey, userName }: { userKey: string; userName: string }) {
+  const { user: currentUser } = useAuth();
+  const isSample = currentUser?.email === DEMO_EMAIL;
+  const exampleId = 'casa-serra';
+  return (
+    <WorkspaceProvider key={userKey} userKey={userKey} userName={userName} sampleMode={isSample} initialSpecs={isSample ? INITIAL_SPECS : {}} initialActivity={isSample ? INITIAL_ACTIVITY : []} exampleId={exampleId} exampleMeta={FALLBACK_PROJECTS.find((project) => project.id === exampleId)} exampleSpecs={INITIAL_SPECS[exampleId]}>
+      <TooltipProvider>
+        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
+          <Router />
+        </WouterRouter>
+        <Toaster />
+      </TooltipProvider>
+    </WorkspaceProvider>
+  );
+}
+
+function AppGate() {
+  const { user } = useAuth();
   return (
     <QueryClientProvider client={queryClient}>
-      <WorkspaceProvider initialSpecs={INITIAL_SPECS} initialActivity={INITIAL_ACTIVITY}>
-        <TooltipProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-            <Router />
-          </WouterRouter>
-          <Toaster />
-        </TooltipProvider>
-      </WorkspaceProvider>
+      {user ? <AuthenticatedApp userKey={user.id} userName={user.name} /> : <AuthScreen />}
     </QueryClientProvider>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppGate />
+    </AuthProvider>
   );
 }
 

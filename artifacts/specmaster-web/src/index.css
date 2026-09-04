@@ -716,3 +716,28 @@ button { cursor: pointer; }
     inset: -1px;
   }
 }
+
+/* Cargo abaixo do nome (cabeçalho superior direito) */
+.header-profile-id { display: inline-flex; flex-direction: column; align-items: flex-start; line-height: 1.2; }
+.header-profile-id strong { font-size: 12px; font-weight: 600; color: hsl(var(--foreground)); }
+.header-profile-id small { font-size: 10px; color: hsl(var(--muted-foreground)); margin-top: 1px; }
+
+/* Afastamento em "Suas pendências": especificação, ambiente e macrozona */
+.pending-main .pending-title { margin: 0; }
+.pending-meta { display: flex; align-items: center; gap: 7px; margin-top: 4px; color: hsl(var(--muted-foreground)); font-size: 10.5px; line-height: 1; }
+.pending-meta i { width: 3px; height: 3px; border-radius: 50%; background: hsl(var(--muted-foreground)); opacity: .6; }
+.pending-meta span:first-child { color: hsl(var(--foreground)); font-weight: 500; }
+
+/* Botão de salvar linha (check) mais claro e clicável */
+.save-row.save-row-action { cursor: pointer; transition: background .14s ease, transform .1s ease; }
+.save-row.save-row-action:hover { background: hsl(154 38% 48% / .32); }
+.save-row.save-row-action:active { transform: scale(.92); }
+
+/* Onboarding de portfólio vazio (novo usuário) */
+.portfolio-onboarding { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 44px 26px; border: 1px dashed hsl(var(--border)); border-radius: 14px; background: hsl(var(--card)); }
+.onboarding-mark { display: grid; place-items: center; width: 44px; height: 44px; margin-bottom: 10px; border-radius: 12px; background: hsl(204 100% 43% / .1); color: hsl(204 100% 43%); }
+.portfolio-onboarding .onboarding-title { margin: 4px 0 0; font-size: 19px; font-weight: 600; letter-spacing: -0.01em; color: hsl(var(--foreground)); }
+.onboarding-copy { max-width: 460px; margin: 0; color: hsl(var(--muted-foreground)); font-size: 13px; line-height: 1.65; }
+.onboarding-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.onboarding-hint { display: inline-flex; align-items: center; gap: 6px; margin-top: 16px; color: hsl(var(--muted-foreground)); font-size: 11px; }
+.matrix-empty-gate { margin-top: 34px; padding: 48px 24px; }
