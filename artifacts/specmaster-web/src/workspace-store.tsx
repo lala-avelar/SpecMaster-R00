@@ -6,7 +6,9 @@ import {
   fetchMemberships,
   fetchProjectZones,
   fetchProjects,
+  fetchRecentActivity,
   fetchSpecifications,
+  insertActivity,
   insertProject,
   insertSpecification,
   isDbId,
@@ -14,6 +16,7 @@ import {
   updateProjectName,
   updateProjectZones,
   updateSpecificationRow,
+  type ActivityDbRow,
   type Membership,
   type Role,
 } from '@/data';
@@ -44,6 +47,21 @@ export const CURRENT_USER = 'Marina Reis';
 
 export const isPending = (spec: MatrixSpec) => spec.status !== 'aprovado';
 
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return 'agora';
+  if (minutes < 60) return `há ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `há ${hours} h`;
+  return `há ${Math.floor(hours / 24)} d`;
+}
+
+function activityFromRow(row: ActivityDbRow, projectName: string): ActivityEntry {
+  const initials = row.author_name ? row.author_name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase() : '?';
+  return { mark: initials, label: row.author_name || 'Alguém', action: row.action, target: row.target, project: projectName, time: relativeTime(row.created_at), tone: 'ink' };
+}
+
 type WorkspaceValue = {
   specsByProject: Record<string, MatrixSpec[]>;
   activity: ActivityEntry[];
@@ -69,7 +87,8 @@ type WorkspaceValue = {
   seedProject: (projectId: string, specs: MatrixSpec[]) => void;
   approveSpec: (projectId: string, specId: string) => void;
   requestChange: (projectId: string, specId: string, responsible: string) => void;
-  pushActivity: (entry: ActivityEntry) => void;
+  pushActivity: (projectId: string, entry: ActivityEntry) => void;
+  activityOf: (projectId: string) => ActivityEntry[];
   requestApproval: (projectId: string, specId: string) => void;
   dismissApproval: () => void;
   createProject: (input: { name: string; client: string; location: string; zones?: string[] }) => string;
@@ -85,6 +104,7 @@ const WorkspaceContext = createContext<WorkspaceValue | null>(null);
 export function WorkspaceProvider({ children, initialSpecs, initialActivity, userKey, userName = CURRENT_USER, sampleMode = false, exampleMeta, exampleSpecs }: { children: ReactNode; initialSpecs: Record<string, MatrixSpec[]>; initialActivity: ActivityEntry[]; userKey?: string; userName?: string; sampleMode?: boolean; exampleMeta?: Project; exampleSpecs?: MatrixSpec[] }) {
   const [specsByProject, setSpecsByProject] = useState<Record<string, MatrixSpec[]>>(initialSpecs);
   const [activity, setActivity] = useState<ActivityEntry[]>(initialActivity);
+  const [activityByProject, setActivityByProject] = useState<Record<string, ActivityEntry[]>>({});
   const [approvalRequest, setApprovalRequest] = useState<{ projectId: string; specId: string } | null>(null);
   const [localProjects, setLocalProjects] = useState<Project[]>([]);
   const [autoImportProjectId, setAutoImportProjectId] = useState<string | null>(null);
@@ -105,6 +125,24 @@ export function WorkspaceProvider({ children, initialSpecs, initialActivity, use
         setMemberships(members.filter((member) => member.userId === userKey));
         setZonesByProject(zones);
         if (!sampleMode) setSpecsByProject(specs);
+        if (!sampleMode) {
+          try {
+            const recent = await fetchRecentActivity();
+            if (!active) return;
+            const nameById = new Map(projects.map((project) => [project.id, project.name]));
+            const grouped: Record<string, ActivityEntry[]> = {};
+            const flat: ActivityEntry[] = [];
+            for (const row of recent) {
+              const entry = activityFromRow(row, nameById.get(row.project_id) ?? 'Projeto');
+              (grouped[row.project_id] ??= []).push(entry);
+              flat.push(entry);
+            }
+            setActivityByProject(grouped);
+            setActivity(flat);
+          } catch {
+            /* tabela de atividade indisponível */
+          }
+        }
       } catch {
         /* sem sessão ou offline: mantém o estado local */
       } finally {
@@ -136,6 +174,23 @@ export function WorkspaceProvider({ children, initialSpecs, initialActivity, use
       setMemberships(members.filter((member) => member.userId === userKey));
       setZonesByProject(zones);
       if (!sampleMode) setSpecsByProject(specs);
+      if (!sampleMode) {
+        try {
+          const recent = await fetchRecentActivity();
+          const nameById = new Map(projects.map((project) => [project.id, project.name]));
+          const grouped: Record<string, ActivityEntry[]> = {};
+          const flat: ActivityEntry[] = [];
+          for (const row of recent) {
+            const entry = activityFromRow(row, nameById.get(row.project_id) ?? 'Projeto');
+            (grouped[row.project_id] ??= []).push(entry);
+            flat.push(entry);
+          }
+          setActivityByProject(grouped);
+          setActivity(flat);
+        } catch {
+          /* ignora */
+        }
+      }
     } catch {
       /* ignora */
     }
@@ -205,7 +260,12 @@ export function WorkspaceProvider({ children, initialSpecs, initialActivity, use
       setSpecsByProject((current) => ({ ...current, [projectId]: (current[projectId] ?? []).map((item) => (item.id === specId ? { ...item, status: 'troca', assignedTo: responsible } : item)) }));
       if (next && isDbId(specId)) updateSpecificationRow(specId, next).catch(() => {});
     },
-    pushActivity: (entry) => setActivity((current) => [entry, ...current]),
+    pushActivity: (projectId, entry) => {
+      setActivity((current) => [entry, ...current]);
+      setActivityByProject((current) => ({ ...current, [projectId]: [entry, ...(current[projectId] ?? [])] }));
+      if (userKey) insertActivity({ projectId, userId: userKey, authorName: entry.label, action: entry.action, target: entry.target }).catch(() => {});
+    },
+    activityOf: (projectId) => activityByProject[projectId] ?? [],
     requestApproval: (projectId, specId) => setApprovalRequest({ projectId, specId }),
     dismissApproval: () => setApprovalRequest(null),
     createProject: (input) => {
@@ -249,7 +309,7 @@ export function WorkspaceProvider({ children, initialSpecs, initialActivity, use
       }
       return id;
     },
-  }), [specsByProject, activity, approvalRequest, localProjects, autoImportProjectId, hiddenProjects, projectNameOverrides, manualSuppliers, userName, sampleMode, ready, memberships, zonesByProject, exampleMeta, exampleSpecs, userKey]);
+  }), [specsByProject, activity, activityByProject, approvalRequest, localProjects, autoImportProjectId, hiddenProjects, projectNameOverrides, manualSuppliers, userName, sampleMode, ready, memberships, zonesByProject, exampleMeta, exampleSpecs, userKey]);
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;
 }

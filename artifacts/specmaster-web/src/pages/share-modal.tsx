@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import { Check, Copy, Link as LinkIcon, Trash2, UserPlus, X } from 'lucide-react';
 import { createInvitation, fetchInvitations, fetchProjectMembers, removeMember, revokeInvitation, updateMemberRole, type Invitation, type MemberInfo, type Role } from '@/data';
 
-const ROLE_LABEL: Record<Role, string> = { admin: 'Administrador', editor: 'Editor', viewer: 'Visualizador' };
+const ROLE_LABEL: Record<Role, string> = { admin: 'Administrador', approver: 'Aprovador', editor: 'Editor', viewer: 'Visualizador' };
 
 function inviteLink(token: string) {
   const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-  return `${window.location.origin}${base}/join/${token}`;
+  return `${window.location.origin}${base}/?join=${token}`;
 }
 
 export default function ShareModal({ projectId, projectName, currentUserId, canManage, onClose }: { projectId: string; projectName: string; currentUserId: string; canManage: boolean; onClose: () => void }) {
@@ -124,6 +124,7 @@ export default function ShareModal({ projectId, projectName, currentUserId, canM
               <select value={role} onChange={(event) => setRole(event.target.value as Role)}>
                 <option value="viewer">Visualizador</option>
                 <option value="editor">Editor</option>
+                <option value="approver">Aprovador</option>
                 <option value="admin">Administrador</option>
               </select>
               <select value={expires} onChange={(event) => setExpires(event.target.value as 'never' | '7' | '30')}>

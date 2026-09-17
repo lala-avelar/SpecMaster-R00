@@ -782,3 +782,5 @@ button { cursor: pointer; }
 .zone-add { display: flex; gap: 8px; }
 .zone-add input { flex: 1; min-height: 34px; padding: 8px 10px; border: 1px solid hsl(var(--border)); border-radius: 6px; background: hsl(var(--card)); font: 12px var(--app-font-sans); outline: none; }
 .zone-add input:focus { border-color: hsl(var(--primary)); }
+.role-badge.approver { color: hsl(268 60% 42%); background: hsl(268 70% 60% / .16); }
+.share-role.approver { color: hsl(268 60% 42%); background: hsl(268 70% 60% / .16); }

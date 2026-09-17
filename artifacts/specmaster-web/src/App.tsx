@@ -97,9 +97,11 @@ const queryClient = new QueryClient();
 function captureInviteToken() {
   if (typeof window === 'undefined') return;
   const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-  const match = window.location.pathname.match(/\/join\/([^/?#]+)/);
-  if (match) {
-    localStorage.setItem('specmaster:pending-invite', decodeURIComponent(match[1]));
+  const queryToken = new URLSearchParams(window.location.search).get('join');
+  const pathMatch = window.location.pathname.match(/\/join\/([^/?#]+)/);
+  const token = queryToken ?? (pathMatch ? decodeURIComponent(pathMatch[1]) : null);
+  if (token) {
+    localStorage.setItem('specmaster:pending-invite', token);
     window.history.replaceState(null, '', `${base}/`);
   }
 }
@@ -690,7 +692,7 @@ function MatrixPage() {
   const meName = authUser?.name ?? CURRENT_USER;
   const meInitials = authUser?.initials ?? 'MR';
   const { projectId } = useParams<{ projectId?: string }>();
-  const { sampleMode, ready, specsByProject, activity, approvalRequest, dismissApproval, requestApproval, localProjects, autoImportProjectId, setAutoImportProjectId, projectNameOverrides, setSpec, addSpecs, removeSpec, seedProject, approveSpec, requestChange, pushActivity, roleOf, zonesOf } = useWorkspace();
+  const { sampleMode, ready, specsByProject, activity, approvalRequest, dismissApproval, requestApproval, localProjects, autoImportProjectId, setAutoImportProjectId, projectNameOverrides, setSpec, addSpecs, removeSpec, seedProject, approveSpec, requestChange, pushActivity, activityOf, roleOf, zonesOf } = useWorkspace();
   const requestedId = projectId;
   const ownsRequested = Boolean(requestedId) && (sampleMode || localProjects.some((project) => project.id === requestedId));
   const id = ownsRequested ? requestedId! : sampleMode ? 'ed-santa-monica' : (localProjects[0]?.id ?? '');
@@ -725,8 +727,8 @@ function MatrixPage() {
   const project = projectNameOverrides[resolvedProject.id] ? { ...resolvedProject, name: projectNameOverrides[resolvedProject.id] } : resolvedProject;
   const role = roleOf(id);
   const canEdit = role !== 'viewer';
-  const canApprove = role === 'admin' || role === null;
-  const canManage = canApprove;
+  const canApprove = role === 'admin' || role === 'approver' || role === null;
+  const canManage = role === 'admin' || role === null;
 
   useEffect(() => {
     if (autoImportProjectId === id) {
@@ -810,13 +812,13 @@ function MatrixPage() {
     addSpecs(id, [draft]);
     setNewSpecOpen(false);
     if (input.zone !== zone) setZone(input.zone);
-    pushActivity({ mark: meInitials, label: meName, action: 'cadastrou', target: draft.item, project: project.name, time: 'agora', tone: 'ink' });
+    pushActivity(id, { mark: meInitials, label: meName, action: 'cadastrou', target: draft.item, project: project.name, time: 'agora', tone: 'ink' });
     pushNotice('Especificação cadastrada.');
   };
 
   const approveRow = (row: MatrixSpec) => {
     approveSpec(id, row.id);
-    pushActivity({ mark: meInitials, label: meName, action: 'aprovou', target: row.item, project: project.name, time: 'agora', tone: 'ink' });
+    pushActivity(id, { mark: meInitials, label: meName, action: 'aprovou', target: row.item, project: project.name, time: 'agora', tone: 'ink' });
     dismissApproval();
     pushNotice(`"${row.item}" aprovado.`);
   };
@@ -852,7 +854,7 @@ function MatrixPage() {
 
   const importRows = (rows: MatrixSpec[]) => {
     addSpecs(id, rows);
-    pushActivity({ mark: meInitials, label: meName, action: 'importou', target: `${rows.length} ${rows.length === 1 ? 'item' : 'itens'} de planilha`, project: project.name, time: 'agora', tone: 'coral' });
+    pushActivity(id, { mark: meInitials, label: meName, action: 'importou', target: `${rows.length} ${rows.length === 1 ? 'item' : 'itens'} de planilha`, project: project.name, time: 'agora', tone: 'coral' });
     pushNotice(`${rows.length} ${rows.length === 1 ? 'item' : 'itens'} importados para revisão.`);
   };
 
@@ -891,7 +893,7 @@ function MatrixPage() {
       <div className="matrix-breadcrumb"><Link href="/" data-testid="link-back-portfolio"><ArrowLeft size={14} /> Portfólio</Link><span>/</span><span>{project.name}</span></div>
       <header className="matrix-header">
         <div>
-          <div className="project-type">MATRIZ DE ESPECIFICAÇÕES <span className="header-status"><span className="pulse-dot" /> AO VIVO</span> <span className={`role-badge ${role ?? 'admin'}`}>{role === 'viewer' ? 'Visualizador' : role === 'editor' ? 'Editor' : 'Administrador'}</span></div>
+          <div className="project-type">MATRIZ DE ESPECIFICAÇÕES <span className="header-status"><span className="pulse-dot" /> AO VIVO</span> <span className={`role-badge ${role ?? 'admin'}`}>{role === 'viewer' ? 'Visualizador' : role === 'editor' ? 'Editor' : role === 'approver' ? 'Aprovador' : 'Administrador'}</span></div>
           <h1 className="matrix-title">{project.name}</h1>
           <p className="matrix-subtitle">{project.client} <span>·</span> {project.location}</p>
         </div>
@@ -938,12 +940,12 @@ function MatrixPage() {
         <div className="empty-search"><PackageSearch size={26} /><strong>{filtered.length ? 'Nenhum item com os filtros aplicados' : 'Nenhuma especificação nesta zona'}</strong><span>{filtered.length ? 'Ajuste os filtros para ver mais itens.' : 'Cadastre uma nova especificação para começar.'}</span></div>
       )}
       <footer className="matrix-footer"><span><span className="legend-dot green" /> Dentro da verba <span className="legend-dot red" /> Acima da verba</span><span className="font-mono-ui">{budgetFiltered.length} itens visíveis</span></footer>
-      <MatrixActivity entries={activity.filter((entry) => entry.project === project.name)} projectName={project.name} />
+      <MatrixActivity entries={activityOf(id)} projectName={project.name} />
       {notice && <div className="toast-note page-enter" role="status" data-testid="status-matrix-toast"><Check size={15} /> {notice}</div>}
       {importOpen && <ImportModal currentUser={meName} onClose={() => setImportOpen(false)} onImport={importRows} />}
       {newSpecOpen && <NewSpecModal defaultResponsible={meName} defaultZone={zone} zones={projectZones} onClose={() => setNewSpecOpen(false)} onSubmit={createSpec} />}
             {approvalSpec && <ApprovalModal spec={approvalSpec} projectName={project.name} onClose={dismissApproval} onApprove={approveRow} />}
-      {changeRequest && <ChangeRequestModal row={changeRequest} reason={changeReason} onReasonChange={setChangeReason} onClose={() => { setChangeRequest(null); setChangeReason(''); }} onSubmit={() => { const row = changeRequest; setChangeRequest(null); setChangeReason(''); requestChange(id, row.id, meName); pushActivity({ mark: meInitials, label: meName, action: 'solicitou troca em', target: row.item, project: project.name, time: 'agora', tone: 'amber' }); pushNotice('Solicitação de troca registrada.'); }} />}
+      {changeRequest && <ChangeRequestModal row={changeRequest} reason={changeReason} onReasonChange={setChangeReason} onClose={() => { setChangeRequest(null); setChangeReason(''); }} onSubmit={() => { const row = changeRequest; setChangeRequest(null); setChangeReason(''); requestChange(id, row.id, meName); pushActivity(id, { mark: meInitials, label: meName, action: 'solicitou troca em', target: row.item, project: project.name, time: 'agora', tone: 'amber' }); pushNotice('Solicitação de troca registrada.'); }} />}
       {shareOpen && <ShareModal projectId={id} projectName={project.name} currentUserId={authUser?.id ?? ''} canManage={canManage} onClose={() => setShareOpen(false)} />}
     </div>
   );

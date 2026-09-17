@@ -154,7 +154,7 @@ export async function deleteSpecificationRow(specId: string): Promise<void> {
   if (error) throw error;
 }
 
-export type Role = 'admin' | 'editor' | 'viewer';
+export type Role = 'admin' | 'approver' | 'editor' | 'viewer';
 export type Membership = { projectId: string; userId: string; role: Role };
 export type MemberInfo = { userId: string; role: Role; name: string; email: string; company: string };
 
@@ -237,5 +237,29 @@ export async function revokeInvitation(id: string): Promise<void> {
   const { error } = await supabase.from('invitations').delete().eq('id', id);
   if (error) throw error;
 }
+
+export type ActivityDbRow = { id: string; project_id: string; author_name: string; action: string; target: string; created_at: string };
+
+export async function fetchRecentActivity(limit = 60): Promise<ActivityDbRow[]> {
+  const { data, error } = await supabase
+    .from('project_activity')
+    .select('id, project_id, author_name, action, target, created_at')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data as ActivityDbRow[];
+}
+
+export async function insertActivity(input: { projectId: string; userId: string; authorName: string; action: string; target: string }): Promise<void> {
+  const { error } = await supabase.from('project_activity').insert({
+    project_id: input.projectId,
+    user_id: input.userId,
+    author_name: input.authorName,
+    action: input.action,
+    target: input.target,
+  });
+  if (error) throw error;
+}
+
 
 
