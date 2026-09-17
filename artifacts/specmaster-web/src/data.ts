@@ -97,14 +97,30 @@ export async function fetchSpecifications(): Promise<Record<string, MatrixSpec[]
   return grouped;
 }
 
-export async function insertProject(input: { id: string; ownerId: string; name: string; client: string; location: string }): Promise<void> {
+export async function insertProject(input: { id: string; ownerId: string; name: string; client: string; location: string; zones?: string[] }): Promise<void> {
   const { error } = await supabase.from('projects').insert({
     id: input.id,
     owner_id: input.ownerId,
     name: input.name,
     client: input.client,
     location: input.location,
+    zones: input.zones ?? null,
   });
+  if (error) throw error;
+}
+
+export async function fetchProjectZones(): Promise<Record<string, string[]>> {
+  const { data, error } = await supabase.from('projects').select('*');
+  if (error) throw error;
+  const out: Record<string, string[]> = {};
+  for (const row of data as { id: string; zones?: string[] | null }[]) {
+    if (Array.isArray(row.zones) && row.zones.length) out[row.id] = row.zones;
+  }
+  return out;
+}
+
+export async function updateProjectZones(id: string, zones: string[]): Promise<void> {
+  const { error } = await supabase.from('projects').update({ zones }).eq('id', id);
   if (error) throw error;
 }
 

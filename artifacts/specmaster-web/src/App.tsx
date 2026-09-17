@@ -78,6 +78,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import NotFound from '@/pages/not-found';
 import {
   CURRENT_USER,
+  DEFAULT_ZONES,
   isPending,
   useWorkspace,
   WorkspaceProvider,
@@ -186,8 +187,14 @@ const MATRIX_SPECS: MatrixSpec[] = [
   { id: 'spec-29', environment: 'Fachada Principal', element: 'Peitoril', item: 'Peitoril em granito', dimension: '20x120 cm', finish: 'Polido', brand: 'Marmoraria Z', budget: 90, quotedPrice: 95, revision: 'R02', assignedTo: 'Marina Reis', status: 'revisao', zone: 'Fachada', updatedAt: '2024-06-07T15:15:00Z' },
 ];
 
-const REVESTIMENTOS = ['Piso', 'Parede', 'Rodapé', 'Soleira/Filete', 'Bancada', 'Teto', 'Peitoril', 'Soco'];
+const REVESTIMENTOS = ['Piso', 'Parede', 'Rodapé', 'Soleira/Filete', 'Bancada', 'Teto', 'Peitoril', 'Sóculo'];
 const LOUCAS_E_METAIS = ['Cuba', 'Tanque', 'Válvula de Cuba', 'Sifão', 'Torneira', 'Bacia Sanitária', 'Ducha Higiênica', 'Acabamento de Registro', 'Acionamento de Chuveiro', 'Ralo'];
+const COMPLEMENTARES = ['Porta', 'Maçaneta', 'Iluminação', 'Acabamento Elétrico'];
+const CATEGORY_ELEMENTS: Record<string, string[]> = {
+  'Revestimentos': REVESTIMENTOS,
+  'Louças e Metais': LOUCAS_E_METAIS,
+  'Complementares': COMPLEMENTARES,
+};
 
 const CASA_SERRA_SPECS: MatrixSpec[] = [
   { id: 'cs-1', environment: 'Estar', element: 'Piso', item: 'Piso vinílico amadeirado', dimension: '1220 × 180 mm', finish: 'Carvalho natural / E=5 mm', brand: 'Tarkett — Injoy', budget: 12800, quotedPrice: 11640, revision: 'R03', assignedTo: 'Marina Reis', status: 'pendente', zone: 'Apartamentos', updatedAt: '2024-06-14T10:10:00Z' },
@@ -228,7 +235,7 @@ const ELEMENT_ICONS: Record<string, LucideIcon> = {
   'Bancada': Table2,
   'Teto': PanelsTopLeft,
   'Peitoril': Square,
-  'Soco': Layers,
+  'Sóculo': Layers,
   'Cuba': CircleDot,
   'Tanque': Waves,
   'Válvula de Cuba': Settings2,
@@ -321,10 +328,8 @@ function parseMoney(value: unknown): number {
 }
 
 function normalizeZone(value: string): Zone {
-  const v = normalizeHeader(value);
-  if (v.includes('comum') || v.includes('comun')) return 'Áreas Comuns';
-  if (v.includes('fachada')) return 'Fachada';
-  return 'Apartamentos';
+  const v = value.trim();
+  return v || DEFAULT_ZONES[0];
 }
 
 function parseCsvText(text: string): Record<string, unknown>[] {
@@ -382,7 +387,7 @@ function parseWorkbookRows(rows: Record<string, unknown>[], currentUserName: str
       revision: 'R01',
       assignedTo: currentUserName,
       status: 'pendente',
-      zone: map.zone ? normalizeZone(String(row[map.zone] ?? '')) : 'Apartamentos',
+      zone: map.zone ? normalizeZone(String(row[map.zone] ?? '')) : DEFAULT_ZONES[0],
       updatedAt: new Date().toISOString(),
     } satisfies MatrixSpec;
   });
@@ -513,8 +518,8 @@ function Portfolio() {
     const quoted = specs.reduce((sum, row) => sum + specTotalValue(row), 0);
     return { budget, quoted, over: quoted > budget };
   };
-  const onCreateProject = (input: { name: string; client: string; location: string; startWith: 'blank' | 'import' }) => {
-    const projectId = createProject({ name: input.name, client: input.client, location: input.location });
+  const onCreateProject = (input: { name: string; client: string; location: string; zones: string[]; startWith: 'blank' | 'import' }) => {
+    const projectId = createProject({ name: input.name, client: input.client, location: input.location, zones: input.zones });
     setNewProjectOpen(false);
     if (input.startWith === 'import') setAutoImportProjectId(projectId);
     setLocation(`/projects/${projectId}`);
@@ -685,7 +690,7 @@ function MatrixPage() {
   const meName = authUser?.name ?? CURRENT_USER;
   const meInitials = authUser?.initials ?? 'MR';
   const { projectId } = useParams<{ projectId?: string }>();
-  const { sampleMode, ready, specsByProject, activity, approvalRequest, dismissApproval, requestApproval, localProjects, autoImportProjectId, setAutoImportProjectId, projectNameOverrides, setSpec, addSpecs, removeSpec, seedProject, approveSpec, requestChange, pushActivity, roleOf } = useWorkspace();
+  const { sampleMode, ready, specsByProject, activity, approvalRequest, dismissApproval, requestApproval, localProjects, autoImportProjectId, setAutoImportProjectId, projectNameOverrides, setSpec, addSpecs, removeSpec, seedProject, approveSpec, requestChange, pushActivity, roleOf, zonesOf } = useWorkspace();
   const requestedId = projectId;
   const ownsRequested = Boolean(requestedId) && (sampleMode || localProjects.some((project) => project.id === requestedId));
   const id = ownsRequested ? requestedId! : sampleMode ? 'ed-santa-monica' : (localProjects[0]?.id ?? '');
@@ -738,20 +743,21 @@ function MatrixPage() {
         revision: 'R01',
         assignedTo: meName,
         status: 'pendente',
-        zone: 'Apartamentos',
+        zone: DEFAULT_ZONES[0],
       })));
     }
   }, [projectQuery.data, specsByProject, id, seedProject]);
 
   const specs: MatrixSpec[] = specsByProject[id] ?? [];
+  const projectZones = zonesOf(id);
   const isOverBudget = (row: MatrixSpec) => specTotalValue(row) > specBudgetValue(row);
   const categoryFor = (row: MatrixSpec) => LOUCAS_E_METAIS.includes(row.element) ? 'Louças e Metais' : REVESTIMENTOS.includes(row.element) ? 'Revestimentos' : 'Complementares';
   const zoneSpecs = useMemo(() => specs.filter((row) => row.zone === zone), [specs, zone]);
-  const zoneCounts = useMemo(() => ({
-    'Apartamentos': specs.filter((row) => row.zone === 'Apartamentos').length,
-    'Áreas Comuns': specs.filter((row) => row.zone === 'Áreas Comuns').length,
-    'Fachada': specs.filter((row) => row.zone === 'Fachada').length,
-  }), [specs]);
+  const zoneCounts = useMemo(() => Object.fromEntries(projectZones.map((item) => [item, specs.filter((row) => row.zone === item).length])), [specs, projectZones]);
+
+  useEffect(() => {
+    if (projectZones.length > 0 && !projectZones.includes(zone)) setZone(projectZones[0]);
+  }, [projectZones, zone]);
   const myPendingCount = useMemo(() => specs.filter((row) => row.assignedTo === meName && isPending(row)).length, [specs, meName]);
   const filtered = useMemo(() => zoneSpecs.filter((row) => [row.environment, row.element, row.item, row.dimension, row.finish, row.brand].join(' ').toLowerCase().includes(search.toLowerCase())), [zoneSpecs, search]);
   const budgetFiltered = useMemo(() => {
@@ -820,7 +826,7 @@ function MatrixPage() {
 
   const exportCSV = () => {
     const rows = budgetFiltered.map((row) => [row.environment, row.zone, categoryFor(row), row.element, row.item, row.dimension, row.finish, row.brand, Number(row.budget) || 0, Number(row.quotedPrice) || 0, specArea(row) || '', specTotalValue(row)]);
-    const header = ['Ambiente', 'Macrozona', 'Categoria', 'Elemento', 'Item', 'Dimensão', 'Acabamento', 'Marca', 'Verba (R$)', 'Custo Cotado (R$)', 'Área Total', 'Valor Total (R$)'];
+    const header = ['Ambiente', 'Macrozona', 'Categoria', 'Elemento', 'Item', 'Dimensão', 'Acabamento', 'Marca', 'Verba (R$)', 'Custo Cotado (R$)', 'Área/Quantidade', 'Valor Total (R$)'];
     const csv = [header, ...rows].map((line) => line.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(';')).join('\n');
     const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -897,7 +903,7 @@ function MatrixPage() {
       </header>
        <BudgetHealthPanel totalBudget={totalBudget} totalQuoted={totalQuoted} overBudgetCount={overBudgetCount} linesCount={zoneSpecs.length} zoneLabel={zone} />
        <section className="matrix-zones" role="tablist" aria-label="Zona do projeto">
-         {(['Apartamentos', 'Áreas Comuns', 'Fachada'] as const).map((item) => <button type="button" key={item} className={zone === item ? 'selected' : ''} onClick={() => setZone(item)} data-testid={`button-zone-${item}`}>{item}<span className="zone-count">{zoneCounts[item]}</span></button>)}
+         {projectZones.map((item) => <button type="button" key={item} className={zone === item ? 'selected' : ''} onClick={() => setZone(item)} data-testid={`button-zone-${item}`}>{item}<span className="zone-count">{zoneCounts[item] ?? 0}</span></button>)}
        </section>
        <section className="matrix-toolbar">
         <div className="toolbar-left">
@@ -935,7 +941,7 @@ function MatrixPage() {
       <MatrixActivity entries={activity.filter((entry) => entry.project === project.name)} projectName={project.name} />
       {notice && <div className="toast-note page-enter" role="status" data-testid="status-matrix-toast"><Check size={15} /> {notice}</div>}
       {importOpen && <ImportModal currentUser={meName} onClose={() => setImportOpen(false)} onImport={importRows} />}
-      {newSpecOpen && <NewSpecModal defaultResponsible={meName} defaultZone={zone} onClose={() => setNewSpecOpen(false)} onSubmit={createSpec} />}
+      {newSpecOpen && <NewSpecModal defaultResponsible={meName} defaultZone={zone} zones={projectZones} onClose={() => setNewSpecOpen(false)} onSubmit={createSpec} />}
             {approvalSpec && <ApprovalModal spec={approvalSpec} projectName={project.name} onClose={dismissApproval} onApprove={approveRow} />}
       {changeRequest && <ChangeRequestModal row={changeRequest} reason={changeReason} onReasonChange={setChangeReason} onClose={() => { setChangeRequest(null); setChangeReason(''); }} onSubmit={() => { const row = changeRequest; setChangeRequest(null); setChangeReason(''); requestChange(id, row.id, meName); pushActivity({ mark: meInitials, label: meName, action: 'solicitou troca em', target: row.item, project: project.name, time: 'agora', tone: 'amber' }); pushNotice('Solicitação de troca registrada.'); }} />}
       {shareOpen && <ShareModal projectId={id} projectName={project.name} currentUserId={authUser?.id ?? ''} canManage={canManage} onClose={() => setShareOpen(false)} />}
@@ -1014,7 +1020,7 @@ function SpecificationTable({ groups, openCategories, onToggleCategory, onChange
         <div className="spec-head-row">
           <div className="head-env">Ambiente</div>
           <div className="head-rest">
-            <div>Elemento</div><div>Item / Descrição</div><div>Dimensão</div><div>Acabamento</div><div>Valor Previsto (R$)</div><div>Custo Cotado (R$)</div><div>Área Total</div><div>Valor Total (R$)</div><div>Δ (R$)</div><div>Aprovação</div><div>Ações</div>
+            <div>Elemento</div><div>Item / Descrição</div><div>Dimensão</div><div>Acabamento</div><div>Valor Previsto (R$)</div><div>Custo Cotado (R$)</div><div>Área/Quantidade</div><div>Valor Total (R$)</div><div>Δ (R$)</div><div>Aprovação</div><div>Ações</div>
           </div>
         </div>
         {groups.map(({ category, rows }) => <Fragment key={category}>
@@ -1192,15 +1198,13 @@ function ChangeRequestModal({ row, reason, onReasonChange, onClose, onSubmit }: 
   );
 }
 
-function NewSpecModal({ defaultResponsible = CURRENT_USER, defaultZone, onClose, onSubmit }: { defaultResponsible?: string; defaultZone: Zone; onClose: () => void; onSubmit: (input: { zone: Zone; category: string; environment: string; element: string; item: string; dimension: string; finish: string; brand: string; budget: number; quotedPrice: number; areaTotal: number; responsible: string }) => void }) {
+function NewSpecModal({ defaultResponsible = CURRENT_USER, defaultZone, zones, onClose, onSubmit }: { defaultResponsible?: string; defaultZone: Zone; zones: string[]; onClose: () => void; onSubmit: (input: { zone: Zone; category: string; environment: string; element: string; item: string; dimension: string; finish: string; brand: string; budget: number; quotedPrice: number; areaTotal: number; responsible: string }) => void }) {
   const { specsByProject } = useWorkspace();
   const [form, setForm] = useState({ zone: defaultZone, category: 'Revestimentos', environment: '', element: '', item: '', dimension: '', finish: '', brand: '', budget: '', quotedPrice: '', areaTotal: '', responsible: defaultResponsible });
-  const elementOptions = useMemo(() => {
-    const used = Object.values(specsByProject).flat().map((row) => row.element).filter((value): value is string => Boolean(value && value.trim()));
-    return Array.from(new Set([...used, ...Object.keys(ELEMENT_ICONS)]));
-  }, [specsByProject]);
+  const elementOptions = useMemo(() => CATEGORY_ELEMENTS[form.category] ?? [], [form.category]);
   const set = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
-  const valid = form.item.trim().length > 0 && form.element.trim().length > 0;
+  const setCategory = (value: string) => setForm((current) => ({ ...current, category: value, element: (CATEGORY_ELEMENTS[value] ?? []).includes(current.element) ? current.element : '' }));
+  const valid = form.zone.trim().length > 0 && form.category.trim().length > 0 && form.environment.trim().length > 0 && form.element.trim().length > 0 && form.item.trim().length > 0;
   const submit = () => onSubmit({ ...form, zone: form.zone as Zone, budget: Number(form.budget) || 0, quotedPrice: Number(form.quotedPrice) || 0, areaTotal: Number(form.areaTotal) || 0 });
 
   const matchedProduct = useMemo(() => {
@@ -1233,17 +1237,17 @@ function NewSpecModal({ defaultResponsible = CURRENT_USER, defaultZone, onClose,
         <div className="modal-top"><div><p className="section-kicker">MATRIZ DE ESPECIFICAÇÕES</p><h2 id="new-spec-title">Cadastrar nova especificação</h2></div><IconButton label="Fechar" testId="button-close-new-spec" onClick={onClose}><X size={18} /></IconButton></div>
         {matchedProduct && <div className="spec-match-note"><CheckCircle2 size={14} /> Preenchido do cadastro: <b>{matchedProduct.item}</b> · {matchedProduct.brand} · {money(Number(matchedProduct.quotedPrice))}</div>}
         <div className="spec-form">
-          <label className="spec-form-field"><span>Macrozona</span><select value={form.zone} onChange={(event) => set('zone', event.target.value)} data-testid="input-new-zone"><option value="Apartamentos">Apartamentos</option><option value="Áreas Comuns">Áreas Comuns</option><option value="Fachada">Fachada</option></select></label>
-          <label className="spec-form-field"><span>Categoria</span><select value={form.category} onChange={(event) => set('category', event.target.value)} data-testid="input-new-category"><option>Revestimentos</option><option>Louças e Metais</option><option>Complementares</option></select></label>
-          <label className="spec-form-field"><span>Ambiente</span><input value={form.environment} onChange={(event) => set('environment', event.target.value)} placeholder="Ex: Cozinha" data-testid="input-new-environment" /></label>
-          <label className="spec-form-field"><span>Elemento</span><select value={form.element} onChange={(event) => set('element', event.target.value)} data-testid="input-new-element"><option value="" disabled>Selecione um elemento</option>{elementOptions.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
+          <label className="spec-form-field"><span>Macrozona *</span><select value={form.zone} onChange={(event) => set('zone', event.target.value)} data-testid="input-new-zone">{zones.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+          <label className="spec-form-field"><span>Categoria *</span><select value={form.category} onChange={(event) => setCategory(event.target.value)} data-testid="input-new-category"><option>Revestimentos</option><option>Louças e Metais</option><option>Complementares</option></select></label>
+          <label className="spec-form-field"><span>Ambiente *</span><input value={form.environment} onChange={(event) => set('environment', event.target.value)} placeholder="Ex: Cozinha" data-testid="input-new-environment" /></label>
+          <label className="spec-form-field"><span>Elemento *</span><select value={form.element} onChange={(event) => set('element', event.target.value)} data-testid="input-new-element"><option value="" disabled>Selecione um elemento</option>{elementOptions.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
           <label className="spec-form-field"><span>Item / Descrição *</span><input value={form.item} onChange={(event) => set('item', event.target.value)} placeholder="Ex: Porcelanato Bianco Covelano" data-testid="input-new-item" /></label>
-          <label className="spec-form-field"><span>Dimensão</span><input value={form.dimension} onChange={(event) => set('dimension', event.target.value)} placeholder="Ex: 90x90 cm" data-testid="input-new-dimension" /></label>
-          <label className="spec-form-field"><span>Acabamento</span><input value={form.finish} onChange={(event) => set('finish', event.target.value)} placeholder="Ex: Nat. Retificado" data-testid="input-new-finish" /></label>
-          <label className="spec-form-field"><span>Marca / Fornecedor</span><input value={form.brand} onChange={(event) => set('brand', event.target.value)} placeholder="Ex: Portobello" data-testid="input-new-brand" /></label>
-          <label className="spec-form-field"><span>Verba prevista (R$)</span><input type="number" value={form.budget} onChange={(event) => set('budget', event.target.value)} placeholder="0,00" data-testid="input-new-budget" /></label>
-          <label className="spec-form-field"><span>Preço cotado (R$)</span><input type="number" value={form.quotedPrice} onChange={(event) => set('quotedPrice', event.target.value)} placeholder="0,00" data-testid="input-new-quoted" /></label>
-          <label className="spec-form-field"><span>Área total (opcional)</span><input type="number" value={form.areaTotal} onChange={(event) => set('areaTotal', event.target.value)} placeholder="Ex: 38" data-testid="input-new-area" /></label>
+          <label className="spec-form-field"><span>Dimensão (opcional)</span><input value={form.dimension} onChange={(event) => set('dimension', event.target.value)} placeholder="Ex: 90x90 cm" data-testid="input-new-dimension" /></label>
+          <label className="spec-form-field"><span>Acabamento (opcional)</span><input value={form.finish} onChange={(event) => set('finish', event.target.value)} placeholder="Ex: Nat. Retificado" data-testid="input-new-finish" /></label>
+          <label className="spec-form-field"><span>Marca / Fornecedor (opcional)</span><input value={form.brand} onChange={(event) => set('brand', event.target.value)} placeholder="Ex: Portobello" data-testid="input-new-brand" /></label>
+          <label className="spec-form-field"><span>Verba prevista (R$) (opcional)</span><input type="number" value={form.budget} onChange={(event) => set('budget', event.target.value)} placeholder="0,00" data-testid="input-new-budget" /></label>
+          <label className="spec-form-field"><span>Preço cotado (R$) (opcional)</span><input type="number" value={form.quotedPrice} onChange={(event) => set('quotedPrice', event.target.value)} placeholder="0,00" data-testid="input-new-quoted" /></label>
+          <label className="spec-form-field"><span>Área/Quantidade (opcional)</span><input type="number" value={form.areaTotal} onChange={(event) => set('areaTotal', event.target.value)} placeholder="Ex: 38" data-testid="input-new-area" /></label>
         </div>
         <div className="modal-actions"><button type="button" className="button button-quiet" onClick={onClose}>Cancelar</button><button type="button" className="button button-primary" onClick={submit} disabled={!valid} data-testid="button-submit-new-spec">Adicionar à matriz</button></div>
       </div>
@@ -1283,18 +1287,61 @@ function ApprovalModal({ spec, projectName, onClose, onApprove }: { spec: Matrix
   );
 }
 
-function NewProjectModal({ onClose, onCreate }: { onClose: () => void; onCreate: (input: { name: string; client: string; location: string; startWith: 'blank' | 'import' }) => void }) {
+const ZONE_PRESETS = [
+  { id: 'edificio', label: 'Edifício residencial', hint: 'Apartamentos, áreas comuns e fachada', zones: ['Apartamentos', 'Áreas Comuns', 'Fachada'] },
+  { id: 'casa', label: 'Casa / Residência', hint: 'Interno, externo e área de serviço', zones: ['Interno', 'Externo', 'Área de serviço'] },
+  { id: 'reforma', label: 'Reforma / Modificações', hint: 'Original x proposta do cliente', zones: ['Ambiente original', 'Proposta do cliente'] },
+  { id: 'custom', label: 'Personalizado', hint: 'Defina suas próprias zonas', zones: [] },
+];
+
+function NewProjectModal({ onClose, onCreate }: { onClose: () => void; onCreate: (input: { name: string; client: string; location: string; zones: string[]; startWith: 'blank' | 'import' }) => void }) {
   const [form, setForm] = useState({ name: '', client: '', location: '', startWith: 'blank' as 'blank' | 'import' });
+  const [zones, setZones] = useState<string[]>(DEFAULT_ZONES);
+  const [preset, setPreset] = useState('edificio');
+  const [newZone, setNewZone] = useState('');
   const set = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
-  const valid = form.name.trim().length > 0;
+  const choosePreset = (id: string, presetZones: string[]) => {
+    setPreset(id);
+    setZones(presetZones);
+  };
+  const addZone = () => {
+    const value = newZone.trim();
+    if (value && !zones.some((zone) => zone.toLowerCase() === value.toLowerCase())) setZones([...zones, value]);
+    setNewZone('');
+    setPreset('custom');
+  };
+  const removeZone = (target: string) => {
+    setZones(zones.filter((zone) => zone !== target));
+    setPreset('custom');
+  };
+  const valid = form.name.trim().length > 0 && zones.length > 0;
   return (
     <ModalShell>
       <div className="import-modal new-project-modal page-enter" role="dialog" aria-modal="true" aria-labelledby="new-project-title">
         <div className="modal-top"><div><p className="section-kicker">PORTFÓLIO</p><h2 id="new-project-title">Criar novo projeto</h2></div><IconButton label="Fechar" testId="button-close-new-project" onClick={onClose}><X size={18} /></IconButton></div>
         <div className="spec-form">
           <label className="spec-form-field spec-form-field-wide"><span>Nome do empreendimento *</span><input value={form.name} onChange={(event) => set('name', event.target.value)} placeholder="Ex: Torre Primavera" data-testid="input-new-project-name" /></label>
-          <label className="spec-form-field"><span>Construtora / cliente</span><input value={form.client} onChange={(event) => set('client', event.target.value)} placeholder="Ex: Construtora Horizonte" data-testid="input-new-project-client" /></label>
-          <label className="spec-form-field"><span>Localização</span><input value={form.location} onChange={(event) => set('location', event.target.value)} placeholder="Ex: São Paulo, SP" data-testid="input-new-project-location" /></label>
+          <label className="spec-form-field"><span>Construtora / cliente (opcional)</span><input value={form.client} onChange={(event) => set('client', event.target.value)} placeholder="Ex: Construtora Horizonte" data-testid="input-new-project-client" /></label>
+          <label className="spec-form-field"><span>Localização (opcional)</span><input value={form.location} onChange={(event) => set('location', event.target.value)} placeholder="Ex: São Paulo, SP" data-testid="input-new-project-location" /></label>
+        </div>
+        <div className="project-start-field">
+          <span>Como você organiza a obra? *</span>
+          <div className="zone-presets">
+            {ZONE_PRESETS.map((option) => (
+              <button key={option.id} type="button" className={preset === option.id ? 'selected' : ''} onClick={() => choosePreset(option.id, option.zones)} data-testid={`preset-${option.id}`}>
+                <strong>{option.label}</strong><small>{option.hint}</small>
+              </button>
+            ))}
+          </div>
+          <div className="zone-list">
+            {zones.length === 0 ? <span className="zone-empty">Nenhuma zona ainda — adicione abaixo.</span> : zones.map((zone) => (
+              <span className="zone-chip" key={zone}>{zone}<button type="button" aria-label={`Remover ${zone}`} onClick={() => removeZone(zone)}><X size={12} /></button></span>
+            ))}
+          </div>
+          <div className="zone-add">
+            <input value={newZone} onChange={(event) => setNewZone(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addZone(); } }} placeholder="Adicionar zona (ex: Cobertura)" data-testid="input-new-zone" />
+            <button type="button" className="button button-quiet button-small" onClick={addZone}><Plus size={13} /> Adicionar</button>
+          </div>
         </div>
         <div className="project-start-field">
           <span>Ponto de partida</span>
@@ -1303,7 +1350,7 @@ function NewProjectModal({ onClose, onCreate }: { onClose: () => void; onCreate:
             <button type="button" className={form.startWith === 'import' ? 'selected' : ''} onClick={() => set('startWith', 'import')} data-testid="start-import"><span className="start-radio" /> <span><strong>Importar planilha (Excel)</strong><small>Preenche a grade a partir de um arquivo .xlsx/.csv</small></span></button>
           </div>
         </div>
-        <div className="modal-actions"><button type="button" className="button button-quiet" onClick={onClose}>Cancelar</button><button type="button" className="button button-primary" onClick={() => onCreate(form)} disabled={!valid} data-testid="button-create-project">Criar projeto</button></div>
+        <div className="modal-actions"><button type="button" className="button button-quiet" onClick={onClose}>Cancelar</button><button type="button" className="button button-primary" onClick={() => onCreate({ ...form, zones })} disabled={!valid} data-testid="button-create-project">Criar projeto</button></div>
       </div>
     </ModalShell>
   );

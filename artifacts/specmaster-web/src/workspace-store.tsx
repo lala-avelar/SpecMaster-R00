@@ -4,6 +4,7 @@ import {
   deleteProjectRow,
   deleteSpecificationRow,
   fetchMemberships,
+  fetchProjectZones,
   fetchProjects,
   fetchSpecifications,
   insertProject,
@@ -11,12 +12,14 @@ import {
   isDbId,
   newId,
   updateProjectName,
+  updateProjectZones,
   updateSpecificationRow,
   type Membership,
   type Role,
 } from '@/data';
 
-export type Zone = 'Apartamentos' | 'Áreas Comuns' | 'Fachada';
+export type Zone = string;
+export const DEFAULT_ZONES = ['Apartamentos', 'Áreas Comuns', 'Fachada'];
 export type ApprovalStatus = 'aprovado' | 'pendente' | 'revisao' | 'troca';
 
 export type MatrixSpec = Specification & {
@@ -54,6 +57,9 @@ type WorkspaceValue = {
   ready: boolean;
   memberships: Membership[];
   roleOf: (projectId: string) => Role | null;
+  zonesByProject: Record<string, string[]>;
+  zonesOf: (projectId: string) => string[];
+  setProjectZones: (projectId: string, zones: string[]) => void;
   registerMembership: (projectId: string, role: Role) => void;
   refreshMemberships: () => Promise<void>;
   reload: () => Promise<void>;
@@ -66,7 +72,7 @@ type WorkspaceValue = {
   pushActivity: (entry: ActivityEntry) => void;
   requestApproval: (projectId: string, specId: string) => void;
   dismissApproval: () => void;
-  createProject: (input: { name: string; client: string; location: string }) => string;
+  createProject: (input: { name: string; client: string; location: string; zones?: string[] }) => string;
   setAutoImportProjectId: (projectId: string | null) => void;
   renameProject: (projectId: string, name: string) => void;
   deleteProject: (projectId: string) => void;
@@ -87,15 +93,17 @@ export function WorkspaceProvider({ children, initialSpecs, initialActivity, use
   const [manualSuppliers, setManualSuppliers] = useState<string[]>([]);
   const [ready, setReady] = useState(false);
   const [memberships, setMemberships] = useState<Membership[]>([]);
+  const [zonesByProject, setZonesByProject] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
     let active = true;
     (async () => {
       try {
-        const [projects, specs, members] = await Promise.all([fetchProjects(), fetchSpecifications(), fetchMemberships()]);
+        const [projects, specs, members, zones] = await Promise.all([fetchProjects(), fetchSpecifications(), fetchMemberships(), fetchProjectZones()]);
         if (!active) return;
         setLocalProjects(projects);
         setMemberships(members.filter((member) => member.userId === userKey));
+        setZonesByProject(zones);
         if (!sampleMode) setSpecsByProject(specs);
       } catch {
         /* sem sessão ou offline: mantém o estado local */
@@ -123,14 +131,22 @@ export function WorkspaceProvider({ children, initialSpecs, initialActivity, use
 
   const reload = async () => {
     try {
-      const [projects, specs, members] = await Promise.all([fetchProjects(), fetchSpecifications(), fetchMemberships()]);
+      const [projects, specs, members, zones] = await Promise.all([fetchProjects(), fetchSpecifications(), fetchMemberships(), fetchProjectZones()]);
       setLocalProjects(projects);
       setMemberships(members.filter((member) => member.userId === userKey));
+      setZonesByProject(zones);
       if (!sampleMode) setSpecsByProject(specs);
     } catch {
       /* ignora */
     }
   };
+
+  const setProjectZones = (projectId: string, zones: string[]) => {
+    setZonesByProject((current) => ({ ...current, [projectId]: zones }));
+    if (isDbId(projectId)) updateProjectZones(projectId, zones).catch(() => {});
+  };
+
+  const zonesOf = (projectId: string) => (zonesByProject[projectId]?.length ? zonesByProject[projectId] : DEFAULT_ZONES);
 
   const persistSpec = (projectId: string, spec: MatrixSpec) => {
     if (!userKey) return;
@@ -158,6 +174,9 @@ export function WorkspaceProvider({ children, initialSpecs, initialActivity, use
     ready,
     memberships,
     roleOf: (projectId) => memberships.find((item) => item.projectId === projectId)?.role ?? null,
+    zonesByProject,
+    zonesOf,
+    setProjectZones,
     registerMembership,
     refreshMemberships,
     reload,
@@ -191,11 +210,13 @@ export function WorkspaceProvider({ children, initialSpecs, initialActivity, use
     dismissApproval: () => setApprovalRequest(null),
     createProject: (input) => {
       const id = newId();
+      const zones = input.zones && input.zones.length ? input.zones : DEFAULT_ZONES;
       const project: Project = { id, name: input.name, client: input.client || '—', location: input.location || '—', completion: 0, updatedAt: new Date().toISOString() };
       setLocalProjects((current) => [...current, project]);
       setSpecsByProject((current) => ({ ...current, [id]: [] }));
+      setZonesByProject((current) => ({ ...current, [id]: zones }));
       registerMembership(id, 'admin');
-      if (userKey) insertProject({ id, ownerId: userKey, name: project.name, client: project.client, location: project.location }).catch(() => {});
+      if (userKey) insertProject({ id, ownerId: userKey, name: project.name, client: project.client, location: project.location, zones }).catch(() => {});
       return id;
     },
     setAutoImportProjectId,
@@ -217,9 +238,10 @@ export function WorkspaceProvider({ children, initialSpecs, initialActivity, use
       const project: Project = { ...exampleMeta, id, name: `${exampleMeta.name} (exemplo)`, completion: 0, updatedAt: new Date().toISOString() };
       setLocalProjects((current) => (current.some((item) => item.id === id) ? current : [...current, project]));
       setSpecsByProject((current) => ({ ...current, [id]: exampleSpecs ? exampleSpecs.map((spec) => ({ ...spec })) : [] }));
+      setZonesByProject((current) => ({ ...current, [id]: DEFAULT_ZONES }));
       registerMembership(id, 'admin');
       if (userKey) {
-        insertProject({ id, ownerId: userKey, name: project.name, client: project.client, location: project.location })
+        insertProject({ id, ownerId: userKey, name: project.name, client: project.client, location: project.location, zones: DEFAULT_ZONES })
           .then(() => {
             (exampleSpecs ?? []).forEach((spec) => persistSpec(id, spec));
           })
@@ -227,7 +249,7 @@ export function WorkspaceProvider({ children, initialSpecs, initialActivity, use
       }
       return id;
     },
-  }), [specsByProject, activity, approvalRequest, localProjects, autoImportProjectId, hiddenProjects, projectNameOverrides, manualSuppliers, userName, sampleMode, ready, memberships, exampleMeta, exampleSpecs, userKey]);
+  }), [specsByProject, activity, approvalRequest, localProjects, autoImportProjectId, hiddenProjects, projectNameOverrides, manualSuppliers, userName, sampleMode, ready, memberships, zonesByProject, exampleMeta, exampleSpecs, userKey]);
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;
 }
