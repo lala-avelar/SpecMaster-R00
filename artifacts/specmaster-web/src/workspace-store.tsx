@@ -56,6 +56,7 @@ type WorkspaceValue = {
   roleOf: (projectId: string) => Role | null;
   registerMembership: (projectId: string, role: Role) => void;
   refreshMemberships: () => Promise<void>;
+  reload: () => Promise<void>;
   setSpec: (projectId: string, spec: MatrixSpec) => void;
   addSpecs: (projectId: string, specs: MatrixSpec[]) => void;
   removeSpec: (projectId: string, specId: string) => void;
@@ -120,6 +121,17 @@ export function WorkspaceProvider({ children, initialSpecs, initialActivity, use
     }
   };
 
+  const reload = async () => {
+    try {
+      const [projects, specs, members] = await Promise.all([fetchProjects(), fetchSpecifications(), fetchMemberships()]);
+      setLocalProjects(projects);
+      setMemberships(members.filter((member) => member.userId === userKey));
+      if (!sampleMode) setSpecsByProject(specs);
+    } catch {
+      /* ignora */
+    }
+  };
+
   const persistSpec = (projectId: string, spec: MatrixSpec) => {
     if (!userKey) return;
     if (isDbId(spec.id)) {
@@ -148,6 +160,7 @@ export function WorkspaceProvider({ children, initialSpecs, initialActivity, use
     roleOf: (projectId) => memberships.find((item) => item.projectId === projectId)?.role ?? null,
     registerMembership,
     refreshMemberships,
+    reload,
     setSpec: (projectId, spec) => {
       setSpecsByProject((current) => ({ ...current, [projectId]: (current[projectId] ?? []).map((item) => (item.id === spec.id ? spec : item)) }));
       persistSpec(projectId, spec);

@@ -1456,21 +1456,21 @@ function EmptyPage({ type }: { type: 'suppliers' | 'settings' }) {
 
 function PendingInviteHandler() {
   const [, setLocation] = useLocation();
-  const { refreshMemberships } = useWorkspace();
+  const { reload } = useWorkspace();
   const { user } = useAuth();
   useEffect(() => {
     const token = localStorage.getItem('specmaster:pending-invite');
     if (!token || !user) return;
     localStorage.removeItem('specmaster:pending-invite');
     acceptInvitation(token)
-      .then((projectId) => {
+      .then(async (projectId) => {
         if (projectId) {
-          refreshMemberships();
+          await reload();
           setLocation(`/projects/${projectId}`);
         }
       })
       .catch(() => {});
-  }, [user, setLocation, refreshMemberships]);
+  }, [user, setLocation, reload]);
   return null;
 }
 

@@ -47,7 +47,7 @@ export default function ShareModal({ projectId, projectName, currentUserId, canM
     setBusy(true);
     try {
       const targetEmail = email.trim();
-      const targetRole: Role = targetEmail ? role : 'viewer';
+      const targetRole: Role = role;
       const expiresAt = expires === 'never' ? null : new Date(Date.now() + Number(expires) * 86400000).toISOString();
       const token = await createInvitation({ projectId, email: targetEmail, role: targetRole, expiresAt, createdBy: currentUserId });
       const generated = inviteLink(token);
@@ -121,7 +121,7 @@ export default function ShareModal({ projectId, projectName, currentUserId, canM
             <p className="filter-menu-label">CONVIDAR</p>
             <div className="share-invite-row">
               <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="e-mail (opcional)" />
-              <select value={email.trim() ? role : 'viewer'} onChange={(event) => setRole(event.target.value as Role)} disabled={!email.trim()} title={!email.trim() ? 'Link aberto entra como Visualizador' : undefined}>
+              <select value={role} onChange={(event) => setRole(event.target.value as Role)}>
                 <option value="viewer">Visualizador</option>
                 <option value="editor">Editor</option>
                 <option value="admin">Administrador</option>
@@ -133,7 +133,7 @@ export default function ShareModal({ projectId, projectName, currentUserId, canM
               </select>
               <button type="button" className="button button-primary" onClick={generateLink} disabled={busy}><UserPlus size={15} /> Gerar link</button>
             </div>
-            <p className="share-hint">{email.trim() ? 'Convite por e-mail: só aquele e-mail consegue aceitar, com o papel escolhido.' : 'Sem e-mail = link aberto: qualquer pessoa com o link entra como Visualizador.'}</p>
+            <p className="share-hint">{email.trim() ? `Convite por e-mail: só aquele e-mail consegue aceitar, como ${ROLE_LABEL[role]}.` : `Link aberto: qualquer pessoa com o link entra como ${ROLE_LABEL[role]}.`}</p>
             {link && (
               <div className="share-link">
                 <LinkIcon size={14} />

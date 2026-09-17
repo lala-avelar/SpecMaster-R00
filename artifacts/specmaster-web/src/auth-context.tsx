@@ -128,10 +128,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (Object.keys(localErrors).length > 0) return { ok: false, errors: localErrors };
 
       const email = input.email.trim().toLowerCase();
+      const emailRedirectTo = typeof window !== 'undefined' ? `${window.location.origin}${import.meta.env.BASE_URL}` : undefined;
       const { data, error } = await supabase.auth.signUp({
         email,
         password: input.password,
         options: {
+          emailRedirectTo,
           data: {
             name: input.name.trim(),
             role: input.role.trim(),
