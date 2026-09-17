@@ -197,6 +197,7 @@ const CATEGORY_ELEMENTS: Record<string, string[]> = {
   'Louças e Metais': LOUCAS_E_METAIS,
   'Complementares': COMPLEMENTARES,
 };
+const ALL_ZONES = 'Todas';
 
 const CASA_SERRA_SPECS: MatrixSpec[] = [
   { id: 'cs-1', environment: 'Estar', element: 'Piso', item: 'Piso vinílico amadeirado', dimension: '1220 × 180 mm', finish: 'Carvalho natural / E=5 mm', brand: 'Tarkett — Injoy', budget: 12800, quotedPrice: 11640, revision: 'R03', assignedTo: 'Marina Reis', status: 'pendente', zone: 'Apartamentos', updatedAt: '2024-06-14T10:10:00Z' },
@@ -758,12 +759,18 @@ function MatrixPage() {
   const projectZones = zonesOf(id);
   const isOverBudget = (row: MatrixSpec) => specTotalValue(row) > specBudgetValue(row);
   const categoryFor = (row: MatrixSpec) => LOUCAS_E_METAIS.includes(row.element) ? 'Louças e Metais' : REVESTIMENTOS.includes(row.element) ? 'Revestimentos' : 'Complementares';
-  const zoneSpecs = useMemo(() => specs.filter((row) => row.zone === zone), [specs, zone]);
-  const zoneCounts = useMemo(() => Object.fromEntries(projectZones.map((item) => [item, specs.filter((row) => row.zone === item).length])), [specs, projectZones]);
+  const hasAllTab = projectZones.length > 1;
+  const zoneSpecs = useMemo(() => (zone === ALL_ZONES ? specs : specs.filter((row) => row.zone === zone)), [specs, zone]);
+  const zoneCounts = useMemo(() => {
+    const counts: Record<string, number> = Object.fromEntries(projectZones.map((item) => [item, specs.filter((row) => row.zone === item).length]));
+    if (hasAllTab) counts[ALL_ZONES] = specs.length;
+    return counts;
+  }, [specs, projectZones, hasAllTab]);
 
   useEffect(() => {
-    if (projectZones.length > 0 && !projectZones.includes(zone)) setZone(projectZones[0]);
-  }, [projectZones, zone]);
+    const valid = hasAllTab ? [ALL_ZONES, ...projectZones] : projectZones;
+    if (valid.length > 0 && !valid.includes(zone)) setZone(hasAllTab ? ALL_ZONES : projectZones[0]);
+  }, [projectZones, zone, hasAllTab]);
 
   useEffect(() => {
     let active = true;
@@ -928,9 +935,9 @@ function MatrixPage() {
           <button type="button" className="button button-quiet" onClick={() => window.print()} data-testid="button-export-print"><Printer size={15} /> Imprimir</button>
         </div>
       </header>
-       <BudgetHealthPanel totalBudget={totalBudget} totalQuoted={totalQuoted} overBudgetCount={overBudgetCount} linesCount={zoneSpecs.length} zoneLabel={zone} />
+       <BudgetHealthPanel totalBudget={totalBudget} totalQuoted={totalQuoted} overBudgetCount={overBudgetCount} linesCount={zoneSpecs.length} zoneLabel={zone === ALL_ZONES ? 'Todas as macrozonas' : zone} />
        <section className="matrix-zones" role="tablist" aria-label="Zona do projeto">
-         {projectZones.map((item) => <button type="button" key={item} className={zone === item ? 'selected' : ''} onClick={() => setZone(item)} data-testid={`button-zone-${item}`}>{item}<span className="zone-count">{zoneCounts[item] ?? 0}</span></button>)}
+         {(hasAllTab ? [ALL_ZONES, ...projectZones] : projectZones).map((item) => <button type="button" key={item} className={zone === item ? 'selected' : ''} onClick={() => setZone(item)} data-testid={`button-zone-${item}`}>{item}<span className="zone-count">{zoneCounts[item] ?? 0}</span></button>)}
        </section>
        <section className="matrix-toolbar">
         <div className="toolbar-left">
@@ -968,7 +975,7 @@ function MatrixPage() {
       <MatrixActivity entries={activityOf(id)} projectName={project.name} />
       {notice && <div className="toast-note page-enter" role="status" data-testid="status-matrix-toast"><Check size={15} /> {notice}</div>}
       {importOpen && <ImportModal currentUser={meName} onClose={() => setImportOpen(false)} onImport={importRows} />}
-      {newSpecOpen && <NewSpecModal defaultResponsible={meName} defaultZone={zone} zones={projectZones} onClose={() => setNewSpecOpen(false)} onSubmit={createSpec} />}
+      {newSpecOpen && <NewSpecModal defaultResponsible={meName} defaultZone={zone === ALL_ZONES ? projectZones[0] : zone} zones={projectZones} onClose={() => setNewSpecOpen(false)} onSubmit={createSpec} />}
             {approvalSpec && <ApprovalModal spec={approvalSpec} projectName={project.name} onClose={dismissApproval} onApprove={approveRow} onReject={rejectRow} />}
       {changeRequest && <ChangeRequestModal row={changeRequest} reason={changeReason} changeType={changeType} members={teamMembers} assignee={changeAssignee} onReasonChange={setChangeReason} onTypeChange={setChangeType} onAssigneeChange={setChangeAssignee} onClose={() => { setChangeRequest(null); setChangeReason(''); }} onSubmit={() => { const row = changeRequest; setChangeRequest(null); setChangeReason(''); requestChange(id, row.id, changeReason.trim(), changeType, changeAssignee); pushActivity(id, { mark: meInitials, label: meName, action: 'solicitou troca em', target: `${row.item} (para ${changeAssignee})`, project: project.name, time: 'agora', tone: 'amber' }); pushNotice(`Solicitação enviada para ${changeAssignee}.`); }} />}
       {shareOpen && <ShareModal projectId={id} projectName={project.name} currentUserId={authUser?.id ?? ''} canManage={canManage} onClose={() => setShareOpen(false)} />}
