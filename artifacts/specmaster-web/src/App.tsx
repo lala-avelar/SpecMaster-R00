@@ -1,21 +1,17 @@
 import { createPortal } from 'react-dom';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import * as XLSX from 'xlsx';
-import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   getGetProjectQueryKey,
   getHealthCheckQueryKey,
   getListProjectsQueryKey,
-  useCreateSpecification,
-  useDeleteSpecification,
   useGetProject,
   useHealthCheck,
   useListProjects,
-  useUpdateSpecification,
   type Project,
   type ProjectDetail,
   type Specification,
-  type SpecificationInput,
 } from '@workspace/api-client-react';
 import {
   AlertTriangle,
@@ -23,14 +19,12 @@ import {
   ArrowLeftRight,
   ArrowUpRight,
   Bath,
-  Bell,
   BookOpen,
   Box,
   Check,
   CheckCircle2,
   ChevronDown,
   CircleDot,
-  CircleHelp,
   ClipboardList,
   Clock,
   CloudUpload,
@@ -93,7 +87,9 @@ import {
 } from '@/workspace-store';
 import { AuthProvider, DEMO_EMAIL, useAuth } from '@/auth-context';
 import { initialsOf } from '@/supabase';
+import { acceptInvitation, isDbId } from '@/data';
 import AuthScreen from '@/pages/auth-screen';
+import ShareModal from '@/pages/share-modal';
 
 const queryClient = new QueryClient();
 
@@ -437,9 +433,6 @@ function Shell({ children }: { children: ReactNode }) {
           <Link href="/settings" className={`nav-item ${location === '/settings' ? 'active' : ''}`} data-testid="link-nav-settings">
             <Settings size={17} /><span>Configurações</span>
           </Link>
-          <button type="button" onClick={() => pushNotice('Central de ajuda disponível em breve.')} className="nav-item nav-button" data-testid="button-help">
-            <CircleHelp size={17} /><span>Central de ajuda</span>
-          </button>
           <button type="button" onClick={logout} className="nav-item nav-button" data-testid="button-logout">
             <LogOut size={17} /><span>Sair</span>
           </button>
@@ -448,7 +441,6 @@ function Shell({ children }: { children: ReactNode }) {
           <div className="system-status">
             <span className={`status-dot ${health.isError ? 'offline' : ''}`} />
             <span>{health.isError ? 'Modo offline' : 'Operação normal'}</span>
-            <span className="font-mono-ui status-time">09:41</span>
           </div>
           <div className="profile-row">
             <span className="profile-avatar">{me.initials}</span>
@@ -481,8 +473,6 @@ function Topbar({ eyebrow, title, action }: { eyebrow: string; title: string; ac
         <h1 className="page-title">{title}</h1>
       </div>
       <div className="topbar-actions">
-        <IconButton label="Notificações" testId="button-notifications"><Bell size={17} /></IconButton>
-        <div className="topbar-divider" />
         {action}
       </div>
     </header>
@@ -493,7 +483,7 @@ function Portfolio() {
   const { user: authUser } = useAuth();
   const meName = authUser?.name ?? CURRENT_USER;
   const projectsQuery = useListProjects({ query: { queryKey: getListProjectsQueryKey(), staleTime: 30000 } });
-  const { sampleMode, adoptExample, specsByProject, requestApproval, activity, localProjects, hiddenProjects, projectNameOverrides, createProject, setAutoImportProjectId, renameProject, deleteProject } = useWorkspace();
+  const { sampleMode, adoptExample, ready, specsByProject, requestApproval, activity, localProjects, hiddenProjects, projectNameOverrides, createProject, setAutoImportProjectId, renameProject, deleteProject } = useWorkspace();
   const demoBase = sampleMode ? FALLBACK_PROJECTS : [];
   const projects = effectiveProjects(Array.isArray(projectsQuery.data) && projectsQuery.data.length ? projectsQuery.data : demoBase, localProjects, hiddenProjects, projectNameOverrides);
   const projectCount = projects.length;
@@ -506,7 +496,6 @@ function Portfolio() {
     setLocation(`/projects/${projectId}`);
   };
   const statusLabel = (status: MatrixSpec['status']) => status === 'troca' ? 'Troca solicitada' : status === 'revisao' ? 'Revisão pendente' : 'Pendente';
-  const completionOf = (projectId: string) => specCompletion(specsByProject[projectId] ?? []);
   const budgetOf = (projectId: string) => {
     const specs = specsByProject[projectId] ?? [];
     const budget = specs.reduce((sum, row) => sum + specBudgetValue(row), 0);
@@ -542,21 +531,19 @@ function Portfolio() {
   return (
     <div className="page-wrap page-enter">
       <Topbar
-        eyebrow="PORTFÓLIO / 2024"
+        eyebrow="PORTFÓLIO"
         title="Visão operacional"
         action={<button type="button" className="button button-primary" onClick={() => setNewProjectOpen(true)} data-testid="button-new-project"><Plus size={16} /> Novo projeto</button>}
       />
       <section className="metric-strip compact-metrics stagger-1" aria-label="Resumo do portfólio">
-        <div className="metric-cell"><span className="metric-label">Projetos ativos</span><strong data-testid="text-active-projects">{projectCount.toString().padStart(2, '0')}</strong><small>+ 1 nesta semana</small></div>
+        <div className="metric-cell"><span className="metric-label">Projetos ativos</span><strong data-testid="text-active-projects">{projectCount.toString().padStart(2, '0')}</strong></div>
         <div className="metric-cell"><span className="metric-label">Itens em revisão</span><strong data-testid="text-pending-count">{myPending.length.toString().padStart(2, '0')}</strong><small className={myPending.length ? 'warning-text' : 'success-text'}>{myPending.length ? `${myPending.length} precisam do seu retorno` : 'tudo em dia'}</small></div>
-        <div className="metric-cell"><span className="metric-label">Aderência à verba</span><strong>82,4<span>%</span></strong><small className="success-text">+4,8% no mês</small></div>
       </section>
       <section className="portfolio-section stagger-2">
         <div className="section-heading">
           <div><p className="section-kicker">EM ANDAMENTO</p><h3>Projetos ativos</h3></div>
-          <span className="muted-label">Atualizado hoje, 09:38</span>
         </div>
-        {projects.length === 0 && !projectsQuery.isLoading ? (
+        {projects.length === 0 && !projectsQuery.isLoading && ready ? (
           <div className="portfolio-onboarding" data-testid="onboarding-empty">
             <div className="onboarding-mark"><FolderKanban size={22} /></div>
             <p className="section-kicker">COMEÇANDO SEU PORTFÓLIO</p>
@@ -564,16 +551,17 @@ function Portfolio() {
             <p className="onboarding-copy">Crie seu primeiro projeto e monte a matriz de especificações do seu jeito — com as marcas, verbas e cotações reais da sua obra. Ou explore um exemplo pronto para entender as possibilidades.</p>
             <div className="onboarding-actions">
               <button type="button" className="button button-primary" onClick={() => setNewProjectOpen(true)} data-testid="button-onboarding-create"><Plus size={15} /> Criar meu primeiro projeto</button>
-              <button type="button" className="button button-quiet" onClick={() => { adoptExample(); setLocation('/projects/casa-serra'); }} data-testid="button-onboarding-example">Começar com um projeto de exemplo <ArrowUpRight size={14} /></button>
+              <button type="button" className="button button-quiet" onClick={() => { const createdId = adoptExample(); if (createdId) setLocation(`/projects/${createdId}`); }} data-testid="button-onboarding-example">Começar com um projeto de exemplo <ArrowUpRight size={14} /></button>
             </div>
             <span className="onboarding-hint"><Lightbulb size={13} /> Você pode importar uma planilha (.xlsx ou .csv) ao criar o projeto.</span>
           </div>
         ) : (
           <div className="project-grid">
             {projects.map((project, index) => (
-              <ProjectCard project={project} completion={completionOf(project.id)} budgetInfo={budgetOf(project.id)} index={index} onRename={setRenameTarget} onDelete={confirmDelete} key={project.id} />
+              <ProjectCard project={project} budgetInfo={budgetOf(project.id)} index={index} onRename={setRenameTarget} onDelete={confirmDelete} key={project.id} />
             ))}
             {!projectsQuery.data && projectsQuery.isLoading && <ProjectSkeleton />}
+            {!ready && <ProjectSkeleton />}
           </div>
         )}
         {projectCount > 0 && projectsQuery.isError && <div className="query-note" data-testid="status-projects-error">Exibindo a última fotografia salva. <button type="button" onClick={() => projectsQuery.refetch()} data-testid="button-retry-projects">Tentar novamente</button></div>}
@@ -606,7 +594,7 @@ function Portfolio() {
         )}
       </section>
       <section className="activity-section compact-activity stagger-4">
-        <div className="section-heading"><div><p className="section-kicker">RASTRO RECENTE</p><h3>O que mudou</h3></div><button type="button" className="text-button" data-testid="button-view-activity">Ver atividade completa <ArrowUpRight size={15} /></button></div>
+        <div className="section-heading"><div><p className="section-kicker">RASTRO RECENTE</p><h3>O que mudou</h3></div></div>
         <div className="activity-list">
           {activity.slice(0, 6).map((entry, index) => (
             <ActivityItem key={`${entry.mark}-${index}`} mark={entry.mark} label={entry.label} action={entry.action} target={entry.target} project={entry.project} time={entry.time} tone={entry.tone} />
@@ -621,7 +609,7 @@ function Portfolio() {
   );
 }
 
-function ProjectCard({ project, completion, budgetInfo, index, onRename, onDelete }: { project: LocalProject; completion: number; budgetInfo: { budget: number; quoted: number; over: boolean }; index: number; onRename: (project: LocalProject) => void; onDelete: (project: LocalProject) => void }) {
+function ProjectCard({ project, budgetInfo, index, onRename, onDelete }: { project: LocalProject; budgetInfo: { budget: number; quoted: number; over: boolean }; index: number; onRename: (project: LocalProject) => void; onDelete: (project: LocalProject) => void }) {
   const [, setLocation] = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -658,9 +646,7 @@ function ProjectCard({ project, completion, budgetInfo, index, onRename, onDelet
         <div className="project-location"><span className="location-pin" /> {project.location}</div>
       </div>
       <div className="project-card-bottom">
-        <div className="completion-copy"><span>ESPECIFICAÇÃO</span><strong>{completion}%</strong></div>
-        <div className="completion-bar"><span style={{ width: `${completion}%` }} /></div>
-        <div className="budget-copy"><span className="budget-label">ORÇAMENTO</span><span className={`card-status ${over ? 'over' : 'under'}`}>{over ? `Estourando ${money(delta)}` : 'Dentro da verba'}</span></div>
+        <div className="budget-copy"><span className="budget-label">ORÇAMENTO</span><span className={`card-status ${over ? 'over' : 'under'}`}>{over ? `Estourando a verba em ${money(delta)}` : 'Dentro da verba prevista'}</span></div>
         <div className="budget-values"><span>Previsto <b>{money(budget)}</b></span><span>Cotado <b className={over ? 'over' : ''}>{money(quoted)}</b></span></div>
         <div className={`budget-bar ${over ? 'over' : ''}`}><span style={{ width: `${Math.min(budgetPct, 100)}%` }} /></div>
         <div className="project-updated">Atualizado {dateLabel(project.updatedAt)}</div>
@@ -688,15 +674,11 @@ function MatrixPage() {
   const meName = authUser?.name ?? CURRENT_USER;
   const meInitials = authUser?.initials ?? 'MR';
   const { projectId } = useParams<{ projectId?: string }>();
-  const { sampleMode, specsByProject, activity, approvalRequest, dismissApproval, requestApproval, localProjects, autoImportProjectId, setAutoImportProjectId, projectNameOverrides, setSpec, addSpecs, removeSpec, seedProject, approveSpec, requestChange, pushActivity, finalizeDraft } = useWorkspace();
+  const { sampleMode, ready, specsByProject, activity, approvalRequest, dismissApproval, requestApproval, localProjects, autoImportProjectId, setAutoImportProjectId, projectNameOverrides, setSpec, addSpecs, removeSpec, seedProject, approveSpec, requestChange, pushActivity, roleOf } = useWorkspace();
   const requestedId = projectId;
   const ownsRequested = Boolean(requestedId) && (sampleMode || localProjects.some((project) => project.id === requestedId));
   const id = ownsRequested ? requestedId! : sampleMode ? 'ed-santa-monica' : (localProjects[0]?.id ?? '');
   const projectQuery = useGetProject(id || 'ed-santa-monica', { query: { queryKey: getGetProjectQueryKey(id || 'ed-santa-monica'), staleTime: 15000 } });
-  const createSpecification = useCreateSpecification();
-  const updateSpecification = useUpdateSpecification();
-  const deleteSpecification = useDeleteSpecification();
-  const queryClient = useQueryClient();
   const [overBudgetOnly, setOverBudgetOnly] = useState(false);
   const [approvalFilter, setApprovalFilter] = useState<'all' | 'pending' | 'approved'>('all');
   const [myPendingOnly, setMyPendingOnly] = useState(false);
@@ -710,6 +692,7 @@ function MatrixPage() {
   const [importOpen, setImportOpen] = useState(false);
   const [notice, setNotice] = useState('');
   const [shareState, setShareState] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [zone, setZone] = useState<Zone>('Apartamentos');
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({
     'Revestimentos': true,
@@ -718,13 +701,16 @@ function MatrixPage() {
   });
   const [changeRequest, setChangeRequest] = useState<MatrixSpec | null>(null);
   const [changeReason, setChangeReason] = useState('');
-  const [changeResponsible, setChangeResponsible] = useState('Felipe');
   const [newSpecOpen, setNewSpecOpen] = useState(false);
 
   const resolvedProject = isProjectDetail(projectQuery.data)
     ? projectQuery.data
     : localProjects.find((item) => item.id === id) ?? FALLBACK_PROJECTS.find((item) => item.id === id) ?? FALLBACK_PROJECTS[0];
   const project = projectNameOverrides[resolvedProject.id] ? { ...resolvedProject, name: projectNameOverrides[resolvedProject.id] } : resolvedProject;
+  const role = roleOf(id);
+  const canEdit = role !== 'viewer';
+  const canApprove = role === 'admin' || role === null;
+  const canManage = canApprove;
 
   useEffect(() => {
     if (autoImportProjectId === id) {
@@ -794,29 +780,8 @@ function MatrixPage() {
 
   const updateLocal = (row: MatrixSpec) => setSpec(id, row);
   const saveRow = (row: MatrixSpec) => {
-    const payload: SpecificationInput = { environment: row.environment, item: row.item, dimension: row.dimension, finish: row.finish, brand: row.brand, budget: Number(row.budget) || 0, quotedPrice: Number(row.quotedPrice) || 0, areaTotal: Number(row.areaTotal) || 0 };
-    if (row.id.startsWith('draft-')) {
-      createSpecification.mutate({ projectId: id, data: payload }, {
-        onSuccess: (created) => {
-          setSpec(id, { ...created, element: row.element, revision: row.revision, assignedTo: row.assignedTo, status: row.status, zone: row.zone });
-          queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(id) });
-          pushNotice('Item adicionado à matriz.');
-        },
-        onError: () => {
-          finalizeDraft(id, row);
-          pushNotice('Linha salva localmente.');
-        },
-      });
-    } else {
-      updateSpecification.mutate({ projectId: id, specificationId: row.id, data: payload }, {
-        onSuccess: (updated) => {
-          setSpec(id, { ...updated, element: row.element, revision: row.revision, assignedTo: row.assignedTo, status: row.status, zone: row.zone });
-          queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(id) });
-          pushNotice('Alteração salva.');
-        },
-        onError: () => pushNotice('Alteração mantida localmente; tente salvar novamente.'),
-      });
-    }
+    setSpec(id, row);
+    pushNotice('Alteração salva.');
   };
 
   const addRow = () => {
@@ -829,18 +794,7 @@ function MatrixPage() {
     setNewSpecOpen(false);
     if (input.zone !== zone) setZone(input.zone);
     pushActivity({ mark: meInitials, label: meName, action: 'cadastrou', target: draft.item, project: project.name, time: 'agora', tone: 'ink' });
-    const payload: SpecificationInput = { environment: draft.environment, item: draft.item, dimension: draft.dimension, finish: draft.finish, brand: draft.brand, budget: draft.budget, quotedPrice: draft.quotedPrice, areaTotal: draft.areaTotal };
-    createSpecification.mutate({ projectId: id, data: payload }, {
-      onSuccess: (created) => {
-        setSpec(id, { ...created, element: draft.element, revision: draft.revision, assignedTo: draft.assignedTo, status: draft.status, zone: draft.zone });
-        queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(id) });
-        pushNotice('Especificação cadastrada.');
-      },
-      onError: () => {
-        finalizeDraft(id, draft);
-        pushNotice('Linha salva localmente.');
-      },
-    });
+    pushNotice('Especificação cadastrada.');
   };
 
   const approveRow = (row: MatrixSpec) => {
@@ -875,14 +829,8 @@ function MatrixPage() {
       return;
     }
     if (!window.confirm(`Remover "${row.item}" da matriz?`)) return;
-    deleteSpecification.mutate({ projectId: id, specificationId: row.id }, {
-      onSuccess: () => {
-        removeSpec(id, row.id);
-        queryClient.invalidateQueries({ queryKey: getGetProjectQueryKey(id) });
-        pushNotice('Item removido.');
-      },
-      onError: () => pushNotice('Não foi possível remover este item.'),
-    });
+    removeSpec(id, row.id);
+    pushNotice('Item removido.');
   };
 
   const importRows = (rows: MatrixSpec[]) => {
@@ -892,12 +840,17 @@ function MatrixPage() {
   };
 
   const share = async () => {
-    try { await navigator.clipboard?.writeText(window.location.href); } catch { /* clipboard can be unavailable in preview */ }
+    if (isDbId(id)) {
+      setShareOpen(true);
+      return;
+    }
+    try { await navigator.clipboard?.writeText(window.location.href); } catch { /* clipboard indisponível */ }
     setShareState(true);
     pushNotice('Link de compartilhamento copiado.');
     window.setTimeout(() => setShareState(false), 2400);
   };
 
+  if (!ready) return <MatrixSkeleton />;
   if (!id) {
     return (
       <div className="page-wrap matrix-page page-enter">
@@ -921,9 +874,9 @@ function MatrixPage() {
       <div className="matrix-breadcrumb"><Link href="/" data-testid="link-back-portfolio"><ArrowLeft size={14} /> Portfólio</Link><span>/</span><span>{project.name}</span></div>
       <header className="matrix-header">
         <div>
-          <div className="project-type">MATRIZ DE ESPECIFICAÇÕES <span className="header-status"><span className="pulse-dot" /> AO VIVO</span></div>
+          <div className="project-type">MATRIZ DE ESPECIFICAÇÕES <span className="header-status"><span className="pulse-dot" /> AO VIVO</span> <span className={`role-badge ${role ?? 'admin'}`}>{role === 'viewer' ? 'Visualizador' : role === 'editor' ? 'Editor' : 'Administrador'}</span></div>
           <h1 className="matrix-title">{project.name}</h1>
-          <p className="matrix-subtitle">{project.client} <span>·</span> {project.location} <span>·</span> última edição há 18 min</p>
+          <p className="matrix-subtitle">{project.client} <span>·</span> {project.location}</p>
         </div>
         <div className="matrix-header-actions">
           <button type="button" className="button button-quiet" onClick={share} data-testid="button-share-project"><Share2 size={15} /> {shareState ? 'Link copiado' : 'Compartilhar'}</button>
@@ -959,30 +912,32 @@ function MatrixPage() {
               <button type="button" className="filter-clear" onClick={() => { setApprovalFilter('all'); setElementFilter(''); setDimensionFilter(''); setEnvironmentFilter(''); setOverBudgetOnly(false); }} data-testid="button-clear-filters">Limpar filtros</button>
             </div>}
           </div>
-          <button type="button" className="button button-quiet" onClick={() => setImportOpen(true)} data-testid="button-open-import"><Upload size={15} /> Importar</button>
-          <button type="button" className="button button-primary" onClick={addRow} data-testid="button-add-spec"><Plus size={15} /> Adicionar linha</button>
+          {canEdit && <button type="button" className="button button-quiet" onClick={() => setImportOpen(true)} data-testid="button-open-import"><Upload size={15} /> Importar</button>}
+          {canEdit && <button type="button" className="button button-primary" onClick={addRow} data-testid="button-add-spec"><Plus size={15} /> Adicionar linha</button>}
         </div>
       </section>
       {projectQuery.isError && <div className="query-note matrix-error" data-testid="status-project-error">A API não respondeu. Você está vendo a última fotografia disponível. <button type="button" onClick={() => projectQuery.refetch()} data-testid="button-retry-project">Tentar novamente</button></div>}
-      {budgetFiltered.length ? <SpecificationTable groups={groupedRows} openCategories={openCategories} onToggleCategory={(category) => setOpenCategories((current) => ({ ...current, [category]: !current[category] }))} onChange={updateLocal} onSave={saveRow} onDelete={removeRow} onRequestChange={setChangeRequest} onOpenApproval={openApproval} /> : (
+      {budgetFiltered.length ? <SpecificationTable groups={groupedRows} openCategories={openCategories} onToggleCategory={(category) => setOpenCategories((current) => ({ ...current, [category]: !current[category] }))} onChange={updateLocal} onSave={saveRow} onDelete={removeRow} onRequestChange={setChangeRequest} onOpenApproval={openApproval} canEdit={canEdit} canApprove={canApprove} /> : (
         <div className="empty-search"><PackageSearch size={26} /><strong>{filtered.length ? 'Nenhum item com os filtros aplicados' : 'Nenhuma especificação nesta zona'}</strong><span>{filtered.length ? 'Ajuste os filtros para ver mais itens.' : 'Cadastre uma nova especificação para começar.'}</span></div>
       )}
-      <footer className="matrix-footer"><span><span className="legend-dot green" /> Dentro da verba <span className="legend-dot red" /> Acima da verba</span><span className="font-mono-ui">{budgetFiltered.length} itens visíveis · Última sincronização 09:38:12</span></footer>
+      <footer className="matrix-footer"><span><span className="legend-dot green" /> Dentro da verba <span className="legend-dot red" /> Acima da verba</span><span className="font-mono-ui">{budgetFiltered.length} itens visíveis</span></footer>
       <MatrixActivity entries={activity.filter((entry) => entry.project === project.name)} projectName={project.name} />
       {notice && <div className="toast-note page-enter" role="status" data-testid="status-matrix-toast"><Check size={15} /> {notice}</div>}
       {importOpen && <ImportModal currentUser={meName} onClose={() => setImportOpen(false)} onImport={importRows} />}
       {newSpecOpen && <NewSpecModal defaultResponsible={meName} defaultZone={zone} onClose={() => setNewSpecOpen(false)} onSubmit={createSpec} />}
-      {approvalSpec && <ApprovalModal spec={approvalSpec} projectName={project.name} onClose={dismissApproval} onApprove={approveRow} />}
-      {changeRequest && <ChangeRequestModal row={changeRequest} reason={changeReason} responsible={changeResponsible} onReasonChange={setChangeReason} onResponsibleChange={setChangeResponsible} onClose={() => { setChangeRequest(null); setChangeReason(''); }} onSubmit={() => { const row = changeRequest; setChangeRequest(null); setChangeReason(''); requestChange(id, row.id, changeResponsible); pushActivity({ mark: meInitials, label: meName, action: 'solicitou troca em', target: row.item, project: project.name, time: 'agora', tone: 'amber' }); pushNotice(`Solicitação de troca enviada para ${changeResponsible}.`); }} />}
+            {approvalSpec && <ApprovalModal spec={approvalSpec} projectName={project.name} onClose={dismissApproval} onApprove={approveRow} />}
+      {changeRequest && <ChangeRequestModal row={changeRequest} reason={changeReason} onReasonChange={setChangeReason} onClose={() => { setChangeRequest(null); setChangeReason(''); }} onSubmit={() => { const row = changeRequest; setChangeRequest(null); setChangeReason(''); requestChange(id, row.id, meName); pushActivity({ mark: meInitials, label: meName, action: 'solicitou troca em', target: row.item, project: project.name, time: 'agora', tone: 'amber' }); pushNotice('Solicitação de troca registrada.'); }} />}
+      {shareOpen && <ShareModal projectId={id} projectName={project.name} currentUserId={authUser?.id ?? ''} canManage={canManage} onClose={() => setShareOpen(false)} />}
     </div>
   );
 }
 
-function EditableCell({ value, onChange, onCommit, numeric, testId }: { value: string | number; onChange: (value: string) => void; onCommit: () => void; numeric?: boolean; testId: string }) {
+function EditableCell({ value, onChange, onCommit, numeric, testId, readOnly }: { value: string | number; onChange: (value: string) => void; onCommit: () => void; numeric?: boolean; testId: string; readOnly?: boolean }) {
+  if (readOnly) return <span className="cell-readonly" data-testid={testId}>{value === '' || value === undefined ? '—' : value}</span>;
   return <input className={`editable-cell ${numeric ? 'numeric-cell' : ''}`} type={numeric ? 'number' : 'text'} value={value} onChange={(event) => onChange(event.target.value)} onBlur={onCommit} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} data-testid={testId} />;
 }
 
-function AutoTextarea({ value, onChange, onCommit, testId }: { value: string; onChange: (value: string) => void; onCommit: () => void; testId: string }) {
+function AutoTextarea({ value, onChange, onCommit, testId, readOnly }: { value: string; onChange: (value: string) => void; onCommit: () => void; testId: string; readOnly?: boolean }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const doResize = useCallback(() => {
     const el = ref.current;
@@ -1004,6 +959,7 @@ function AutoTextarea({ value, onChange, onCommit, testId }: { value: string; on
     observer.observe(el);
     return () => observer.disconnect();
   }, [value, doResize]);
+  if (readOnly) return <span className="cell-readonly" data-testid={testId}>{value}</span>;
   return <textarea ref={ref} rows={1} className="editable-cell item-input" value={value} onChange={(event) => onChange(event.target.value)} onInput={doResize} onBlur={onCommit} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) event.currentTarget.blur(); }} data-testid={testId} />;
 }
 
@@ -1012,7 +968,7 @@ function ElementGlyph({ element }: { element: string }) {
   return <Icon size={15} strokeWidth={1.9} />;
 }
 
-function SpecificationTable({ groups, openCategories, onToggleCategory, onChange, onSave, onDelete, onRequestChange, onOpenApproval }: { groups: { category: string; rows: MatrixSpec[] }[]; openCategories: Record<string, boolean>; onToggleCategory: (category: string) => void; onChange: (row: MatrixSpec) => void; onSave: (row: MatrixSpec) => void; onDelete: (row: MatrixSpec) => void; onRequestChange: (row: MatrixSpec) => void; onOpenApproval: (row: MatrixSpec) => void }) {
+function SpecificationTable({ groups, openCategories, onToggleCategory, onChange, onSave, onDelete, onRequestChange, onOpenApproval, canEdit = true, canApprove = true }: { groups: { category: string; rows: MatrixSpec[] }[]; openCategories: Record<string, boolean>; onToggleCategory: (category: string) => void; onChange: (row: MatrixSpec) => void; onSave: (row: MatrixSpec) => void; onDelete: (row: MatrixSpec) => void; onRequestChange: (row: MatrixSpec) => void; onOpenApproval: (row: MatrixSpec) => void; canEdit?: boolean; canApprove?: boolean }) {
   const edit = (row: MatrixSpec, key: keyof MatrixSpec, value: string) => onChange({ ...row, [key]: key === 'budget' || key === 'quotedPrice' || key === 'areaTotal' ? Number(value) : value });
   const deltaLabel = (row: MatrixSpec) => {
     const delta = specBudgetValue(row) - specTotalValue(row);
@@ -1073,16 +1029,16 @@ function SpecificationTable({ groups, openCategories, onToggleCategory, onChange
                     return (
                       <div className="spec-row" role="row" key={row.id} data-testid={`row-spec-${row.id}`}>
                         <div className="element-cell"><Tooltip delayDuration={150}><TooltipTrigger asChild><span className="element-icon" data-testid={`icon-element-${row.id}`}><ElementGlyph element={row.element} /></span></TooltipTrigger><TooltipContent side="right">{row.element}</TooltipContent></Tooltip></div>
-                        <div className="item-cell"><AutoTextarea value={row.item} onChange={(value) => edit(row, 'item', value)} onCommit={() => onSave(row)} testId={`input-item-${row.id}`} /></div>
-                        <div><EditableCell value={row.dimension} onChange={(value) => edit(row, 'dimension', value)} onCommit={() => onSave(row)} testId={`input-dimension-${row.id}`} /></div>
-                        <div><EditableCell value={row.finish} onChange={(value) => edit(row, 'finish', value)} onCommit={() => onSave(row)} testId={`input-finish-${row.id}`} /></div>
-                        <div><EditableCell value={row.budget} onChange={(value) => edit(row, 'budget', value)} onCommit={() => onSave(row)} numeric testId={`input-budget-${row.id}`} /></div>
-                        <div><span className={`price-inline ${under ? 'price-under' : 'price-over'}`}><EditableCell value={row.quotedPrice} onChange={(value) => edit(row, 'quotedPrice', value)} onCommit={() => onSave(row)} numeric testId={`input-quoted-${row.id}`} /></span></div>
-                        <div><EditableCell value={row.areaTotal ?? ''} onChange={(value) => edit(row, 'areaTotal', value)} onCommit={() => onSave(row)} numeric testId={`input-area-${row.id}`} /></div>
+                        <div className="item-cell"><AutoTextarea value={row.item} onChange={(value) => edit(row, 'item', value)} onCommit={() => onSave(row)} testId={`input-item-${row.id}`} readOnly={!canEdit} /></div>
+                        <div><EditableCell value={row.dimension} onChange={(value) => edit(row, 'dimension', value)} onCommit={() => onSave(row)} testId={`input-dimension-${row.id}`} readOnly={!canEdit} /></div>
+                        <div><EditableCell value={row.finish} onChange={(value) => edit(row, 'finish', value)} onCommit={() => onSave(row)} testId={`input-finish-${row.id}`} readOnly={!canEdit} /></div>
+                        <div><EditableCell value={row.budget} onChange={(value) => edit(row, 'budget', value)} onCommit={() => onSave(row)} numeric testId={`input-budget-${row.id}`} readOnly={!canEdit} /></div>
+                        <div><span className={`price-inline ${under ? 'price-under' : 'price-over'}`}><EditableCell value={row.quotedPrice} onChange={(value) => edit(row, 'quotedPrice', value)} onCommit={() => onSave(row)} numeric testId={`input-quoted-${row.id}`} readOnly={!canEdit} /></span></div>
+                        <div><EditableCell value={row.areaTotal ?? ''} onChange={(value) => edit(row, 'areaTotal', value)} onCommit={() => onSave(row)} numeric testId={`input-area-${row.id}`} readOnly={!canEdit} /></div>
                         <div>{specArea(row) > 0 ? <span className="total-value price-inline"><strong>{money(specTotalValue(row))}</strong></span> : <span className="total-value-empty">—</span>}</div>
                         <div><span className={`delta-value ${deltaClass(row)}`}>{deltaLabel(row)}</span></div>
-                        <div>{approved ? <Tooltip delayDuration={150}><TooltipTrigger asChild><span className="approve-icon ok" data-testid={`approve-ok-${row.id}`}><CheckCircle2 size={14} /></span></TooltipTrigger><TooltipContent side="right">Aprovado por {row.assignedTo}</TooltipContent></Tooltip> : <Tooltip delayDuration={150}><TooltipTrigger asChild><button type="button" className="approve-icon pending approve-action" title={`Revisar ${row.item}`} onClick={() => onOpenApproval(row)} data-testid={`button-approve-${row.id}`}><Clock size={14} /></button></TooltipTrigger><TooltipContent side="right">Revisar aprovação — responsável: {row.assignedTo}</TooltipContent></Tooltip>}</div>
-                        <div className="row-actions"><IconButton label="Solicitar troca" className="change-icon" testId={`button-request-change-${row.id}`} onClick={() => onRequestChange(row)}><ArrowLeftRight size={14} /></IconButton>{row.id.startsWith('draft-') && <Tooltip delayDuration={150}><TooltipTrigger asChild><button type="button" className="save-row save-row-action" title="Salvar linha na matriz" onClick={() => onSave(row)} data-testid={`button-save-row-${row.id}`}><Check size={14} /></button></TooltipTrigger><TooltipContent side="right">Salvar esta linha na matriz</TooltipContent></Tooltip>}<IconButton label={`Remover ${row.item}`} className="delete-row" testId={`button-delete-row-${row.id}`} onClick={() => onDelete(row)}><Trash2 size={14} /></IconButton></div>
+                        <div>{approved ? <Tooltip delayDuration={150}><TooltipTrigger asChild><span className="approve-icon ok" data-testid={`approve-ok-${row.id}`}><CheckCircle2 size={14} /></span></TooltipTrigger><TooltipContent side="right">Aprovado por {row.assignedTo}</TooltipContent></Tooltip> : canApprove ? <Tooltip delayDuration={150}><TooltipTrigger asChild><button type="button" className="approve-icon pending approve-action" title={`Revisar ${row.item}`} onClick={() => onOpenApproval(row)} data-testid={`button-approve-${row.id}`}><Clock size={14} /></button></TooltipTrigger><TooltipContent side="right">Revisar aprovação — responsável: {row.assignedTo}</TooltipContent></Tooltip> : <Tooltip delayDuration={150}><TooltipTrigger asChild><span className="approve-icon pending" data-testid={`approve-locked-${row.id}`}><Clock size={14} /></span></TooltipTrigger><TooltipContent side="right">Aguardando aprovação do administrador</TooltipContent></Tooltip>}</div>
+                        <div className="row-actions">{canEdit && <IconButton label="Solicitar troca" className="change-icon" testId={`button-request-change-${row.id}`} onClick={() => onRequestChange(row)}><ArrowLeftRight size={14} /></IconButton>}{canEdit && row.id.startsWith('draft-') && <Tooltip delayDuration={150}><TooltipTrigger asChild><button type="button" className="save-row save-row-action" title="Salvar linha na matriz" onClick={() => onSave(row)} data-testid={`button-save-row-${row.id}`}><Check size={14} /></button></TooltipTrigger><TooltipContent side="right">Salvar esta linha na matriz</TooltipContent></Tooltip>}{canEdit && <IconButton label={`Remover ${row.item}`} className="delete-row" testId={`button-delete-row-${row.id}`} onClick={() => onDelete(row)}><Trash2 size={14} /></IconButton>}</div>
                       </div>
                     );
                   })}
@@ -1122,7 +1078,6 @@ function MatrixActivity({ entries, projectName }: { entries: ActivityEntry[]; pr
     <section className="activity-section matrix-activity">
       <div className="section-heading">
         <div><p className="section-kicker">RASTRO DE ALTERAÇÕES</p><h3>O que mudou</h3></div>
-        <button type="button" className="text-button" data-testid="button-matrix-activity-all">Ver atividade completa <ArrowUpRight size={15} /></button>
       </div>
       <div className="activity-list">
         {entries.map((entry, index) => (
@@ -1208,7 +1163,7 @@ function ImportModal({ currentUser = CURRENT_USER, onClose, onImport }: { curren
   );
 }
 
-function ChangeRequestModal({ row, reason, responsible, onReasonChange, onResponsibleChange, onClose, onSubmit }: { row: MatrixSpec; reason: string; responsible: string; onReasonChange: (value: string) => void; onResponsibleChange: (value: string) => void; onClose: () => void; onSubmit: () => void }) {
+function ChangeRequestModal({ row, reason, onReasonChange, onClose, onSubmit }: { row: MatrixSpec; reason: string; onReasonChange: (value: string) => void; onClose: () => void; onSubmit: () => void }) {
   return (
     <ModalShell>
       <div className="import-modal change-request-modal page-enter" role="dialog" aria-modal="true" aria-labelledby="change-request-title">
@@ -1219,7 +1174,6 @@ function ChangeRequestModal({ row, reason, responsible, onReasonChange, onRespon
           <div><span>ITEM PROPOSTO</span><strong>A definir</strong><small>Informe o novo item após enviar</small></div>
         </div>
         <div className="cost-difference"><span>Diferença estimada</span><strong className={Number(row.quotedPrice) > Number(row.budget) ? 'over-text' : 'under-text'}>{Number(row.quotedPrice) > Number(row.budget) ? '+' : '-'}{money(Math.abs(Number(row.quotedPrice) - Number(row.budget)))}</strong></div>
-        <label className="reason-field"><span>Pessoa / setor responsável</span><select value={responsible} onChange={(event) => onResponsibleChange(event.target.value)} data-testid="select-change-responsible"><option value="Marina Reis">Marina Reis (Arquitetura)</option><option value="Felipe">Felipe (Orçamento)</option><option value="Lucas">Lucas (Projeto)</option></select></label>
         <label className="reason-field"><span>Motivo da solicitação</span><textarea value={reason} onChange={(event) => onReasonChange(event.target.value)} placeholder="Explique por que este item precisa ser substituído." data-testid="input-change-reason" /></label>
         <div className="modal-actions"><button type="button" className="button button-quiet" onClick={onClose}>Cancelar</button><button type="button" className="button button-primary" onClick={onSubmit} disabled={!reason.trim()} data-testid="button-submit-change-request">Enviar para Aprovação Simultânea</button></div>
       </div>
@@ -1276,7 +1230,6 @@ function NewSpecModal({ defaultResponsible = CURRENT_USER, defaultZone, onClose,
           <label className="spec-form-field"><span>Dimensão</span><input value={form.dimension} onChange={(event) => set('dimension', event.target.value)} placeholder="Ex: 90x90 cm" data-testid="input-new-dimension" /></label>
           <label className="spec-form-field"><span>Acabamento</span><input value={form.finish} onChange={(event) => set('finish', event.target.value)} placeholder="Ex: Nat. Retificado" data-testid="input-new-finish" /></label>
           <label className="spec-form-field"><span>Marca / Fornecedor</span><input value={form.brand} onChange={(event) => set('brand', event.target.value)} placeholder="Ex: Portobello" data-testid="input-new-brand" /></label>
-          <label className="spec-form-field"><span>Responsável pela aprovação</span><select value={form.responsible} onChange={(event) => set('responsible', event.target.value)} data-testid="input-new-responsible">{!['Marina Reis', 'Felipe', 'Lucas', 'André Ribeiro', 'Carla Souza'].includes(defaultResponsible) && <option value={defaultResponsible}>{defaultResponsible}</option>}<option value="Marina Reis">Marina Reis</option><option value="Felipe">Felipe</option><option value="Lucas">Lucas</option><option value="André Ribeiro">André Ribeiro</option><option value="Carla Souza">Carla Souza</option></select></label>
           <label className="spec-form-field"><span>Verba prevista (R$)</span><input type="number" value={form.budget} onChange={(event) => set('budget', event.target.value)} placeholder="0,00" data-testid="input-new-budget" /></label>
           <label className="spec-form-field"><span>Preço cotado (R$)</span><input type="number" value={form.quotedPrice} onChange={(event) => set('quotedPrice', event.target.value)} placeholder="0,00" data-testid="input-new-quoted" /></label>
           <label className="spec-form-field"><span>Área total (opcional)</span><input type="number" value={form.areaTotal} onChange={(event) => set('areaTotal', event.target.value)} placeholder="Ex: 38" data-testid="input-new-area" /></label>
@@ -1488,23 +1441,44 @@ function EmptyPage({ type }: { type: 'suppliers' | 'settings' }) {
   const isSuppliers = type === 'suppliers';
   return (
     <div className="page-wrap page-enter">
-      <Topbar eyebrow={isSuppliers ? 'WORKSPACE / RELACIONAMENTOS' : 'WORKSPACE / PREFERÊNCIAS'} title={isSuppliers ? 'Fornecedores' : 'Configurações'} action={isSuppliers ? <button type="button" className="button button-primary" onClick={() => window.alert('O cadastro de fornecedores será habilitado em breve.')} data-testid="button-new-supplier"><Plus size={16} /> Novo fornecedor</button> : undefined} />
+      <Topbar eyebrow={isSuppliers ? 'WORKSPACE / RELACIONAMENTOS' : 'WORKSPACE / PREFERÊNCIAS'} title={isSuppliers ? 'Fornecedores' : 'Configurações'} />
       <div className={`useful-empty ${isSuppliers ? 'suppliers-empty' : 'settings-empty'}`}>
         <div className="empty-orbit"><div className="orbit-ring ring-one" /><div className="orbit-ring ring-two" />{isSuppliers ? <Users size={34} /> : <Settings size={34} />}</div>
         <p className="section-kicker">{isSuppliers ? 'DIRETÓRIO DE COMPRAS' : 'SEU WORKSPACE'}</p>
          <h2>{isSuppliers ? <>Um lugar para cada<br /><span>parceiro de confiança.</span></> : <>Ajustes que deixam<br /><span>o trabalho no ritmo certo.</span></>}</h2>
         <p>{isSuppliers ? 'O diretório ainda está vazio. Cadastre os fornecedores que acompanham suas obras para encontrar marcas, contatos e condições sem sair do contexto da especificação.' : 'As preferências do workspace serão liberadas quando sua equipe começar a compartilhar matrizes. Por enquanto, seu espaço já está funcionando com as configurações essenciais.'}</p>
-        <div className="empty-actions">{isSuppliers ? <button type="button" className="button button-primary" onClick={() => window.alert('Convite de fornecedor preparado.')} data-testid="button-invite-supplier"><Users size={15} /> Convidar fornecedor</button> : <Link href="/" className="button button-primary" data-testid="link-settings-portfolio"><LayoutDashboard size={15} /> Voltar ao portfólio</Link>}<button type="button" className="text-button" onClick={() => window.alert('Guia rápido aberto.')} data-testid="button-empty-guide">Como funciona <ArrowUpRight size={15} /></button></div>
+        <div className="empty-actions"><Link href="/" className="button button-primary" data-testid="link-settings-portfolio"><LayoutDashboard size={15} /> Voltar ao portfólio</Link></div>
       </div>
       <div className="empty-context"><span><BookOpen size={16} /> Dica de operação</span><p>{isSuppliers ? 'Comece pelas marmorarias e marcenarias que aparecem em mais de um projeto.' : 'Você pode editar cada célula diretamente na matriz. As cores mudam no mesmo instante.'}</p></div>
     </div>
   );
 }
 
+function PendingInviteHandler() {
+  const [, setLocation] = useLocation();
+  const { refreshMemberships } = useWorkspace();
+  const { user } = useAuth();
+  useEffect(() => {
+    const token = localStorage.getItem('specmaster:pending-invite');
+    if (!token || !user) return;
+    localStorage.removeItem('specmaster:pending-invite');
+    acceptInvitation(token)
+      .then((projectId) => {
+        if (projectId) {
+          refreshMemberships();
+          setLocation(`/projects/${projectId}`);
+        }
+      })
+      .catch(() => {});
+  }, [user, setLocation, refreshMemberships]);
+  return null;
+}
+
 function Router() {
   const [location] = useLocation();
   return (
     <ErrorBoundary resetKey={location}>
+      <PendingInviteHandler />
       <Shell>
         <Switch>
           <Route path="/" component={Portfolio} />
@@ -1524,7 +1498,7 @@ function AuthenticatedApp({ userKey, userName }: { userKey: string; userName: st
   const isSample = currentUser?.email === DEMO_EMAIL;
   const exampleId = 'casa-serra';
   return (
-    <WorkspaceProvider key={userKey} userKey={userKey} userName={userName} sampleMode={isSample} initialSpecs={isSample ? INITIAL_SPECS : {}} initialActivity={isSample ? INITIAL_ACTIVITY : []} exampleId={exampleId} exampleMeta={FALLBACK_PROJECTS.find((project) => project.id === exampleId)} exampleSpecs={INITIAL_SPECS[exampleId]}>
+    <WorkspaceProvider key={userKey} userKey={userKey} userName={userName} sampleMode={isSample} initialSpecs={isSample ? INITIAL_SPECS : {}} initialActivity={isSample ? INITIAL_ACTIVITY : []} exampleMeta={FALLBACK_PROJECTS.find((project) => project.id === exampleId)} exampleSpecs={INITIAL_SPECS[exampleId]}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
           <Router />
@@ -1537,6 +1511,16 @@ function AuthenticatedApp({ userKey, userName }: { userKey: string; userName: st
 
 function AppGate() {
   const { user, loading } = useAuth();
+
+  useEffect(() => {
+    const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+    const match = window.location.pathname.match(/\/join\/([^/?#]+)/);
+    if (match) {
+      localStorage.setItem('specmaster:pending-invite', decodeURIComponent(match[1]));
+      window.history.replaceState(null, '', `${base}/`);
+    }
+  }, []);
+
   if (loading) {
     return (
       <QueryClientProvider client={queryClient}>
