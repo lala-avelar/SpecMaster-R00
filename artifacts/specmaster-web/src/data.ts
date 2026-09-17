@@ -26,6 +26,8 @@ type DbSpec = {
   assigned_to: string;
   status: string;
   zone: string;
+  change_type: string;
+  change_reason: string;
   updated_at: string;
 };
 
@@ -59,6 +61,8 @@ export function toSpec(row: DbSpec): MatrixSpec {
     assignedTo: row.assigned_to,
     status: row.status as ApprovalStatus,
     zone: row.zone as Zone,
+    changeType: row.change_type ?? '',
+    changeReason: row.change_reason ?? '',
   };
 }
 
@@ -77,6 +81,8 @@ function specFields(spec: MatrixSpec) {
     assigned_to: spec.assignedTo,
     status: spec.status,
     zone: spec.zone,
+    change_type: spec.changeType ?? '',
+    change_reason: spec.changeReason ?? '',
     updated_at: new Date().toISOString(),
   };
 }
@@ -135,17 +141,23 @@ export async function deleteProjectRow(id: string): Promise<void> {
 }
 
 export async function insertSpecification(projectId: string, spec: MatrixSpec): Promise<string> {
-  const { data, error } = await supabase
-    .from('specifications')
-    .insert({ project_id: projectId, ...specFields(spec) })
-    .select('id')
-    .single();
+  const payload = { project_id: projectId, ...specFields(spec) };
+  let { data, error } = await supabase.from('specifications').insert(payload).select('id').single();
+  if (error && /change_type|change_reason/.test(error.message)) {
+    const { change_type: _ct, change_reason: _cr, ...rest } = payload;
+    ({ data, error } = await supabase.from('specifications').insert(rest).select('id').single());
+  }
   if (error) throw error;
   return (data as { id: string }).id;
 }
 
 export async function updateSpecificationRow(specId: string, spec: MatrixSpec): Promise<void> {
-  const { error } = await supabase.from('specifications').update(specFields(spec)).eq('id', specId);
+  const payload = specFields(spec);
+  let { error } = await supabase.from('specifications').update(payload).eq('id', specId);
+  if (error && /change_type|change_reason/.test(error.message)) {
+    const { change_type: _ct, change_reason: _cr, ...rest } = payload;
+    ({ error } = await supabase.from('specifications').update(rest).eq('id', specId));
+  }
   if (error) throw error;
 }
 

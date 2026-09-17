@@ -110,7 +110,7 @@ export default function ShareModal({ projectId, projectName, currentUserId, canM
       <div className="import-modal share-modal page-enter" role="dialog" aria-modal="true" aria-labelledby="share-title" onClick={(event) => event.stopPropagation()} style={{ width: 'min(100%, 560px)' }}>
         <div className="modal-top">
           <div>
-            <p className="section-kicker">COMPARTILHAR PROJETO</p>
+            <p className="section-kicker">EQUIPE DO PROJETO</p>
             <h2 id="share-title">{projectName}</h2>
           </div>
           <button type="button" className="icon-button" aria-label="Fechar" onClick={onClose}><X size={18} /></button>

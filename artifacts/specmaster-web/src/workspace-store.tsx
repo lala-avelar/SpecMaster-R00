@@ -31,6 +31,8 @@ export type MatrixSpec = Specification & {
   assignedTo: string;
   status: ApprovalStatus;
   zone: Zone;
+  changeType?: string;
+  changeReason?: string;
 };
 
 export type ActivityEntry = {
@@ -86,7 +88,8 @@ type WorkspaceValue = {
   removeSpec: (projectId: string, specId: string) => void;
   seedProject: (projectId: string, specs: MatrixSpec[]) => void;
   approveSpec: (projectId: string, specId: string) => void;
-  requestChange: (projectId: string, specId: string, responsible: string) => void;
+  requestChange: (projectId: string, specId: string, reason: string, changeType: string, assignee: string) => void;
+  rejectChange: (projectId: string, specId: string) => void;
   pushActivity: (projectId: string, entry: ActivityEntry) => void;
   activityOf: (projectId: string) => ActivityEntry[];
   requestApproval: (projectId: string, specId: string) => void;
@@ -250,14 +253,20 @@ export function WorkspaceProvider({ children, initialSpecs, initialActivity, use
     seedProject: (projectId, specs) => setSpecsByProject((current) => (current[projectId]?.length ? current : { ...current, [projectId]: specs })),
     approveSpec: (projectId, specId) => {
       const changed = (specsByProject[projectId] ?? []).find((item) => item.id === specId);
-      const next = changed ? { ...changed, status: 'aprovado' as ApprovalStatus, assignedTo: userName } : null;
-      setSpecsByProject((current) => ({ ...current, [projectId]: (current[projectId] ?? []).map((item) => (item.id === specId ? { ...item, status: 'aprovado', assignedTo: userName } : item)) }));
+      const next = changed ? { ...changed, status: 'aprovado' as ApprovalStatus, assignedTo: userName, changeType: '', changeReason: '' } : null;
+      setSpecsByProject((current) => ({ ...current, [projectId]: (current[projectId] ?? []).map((item) => (item.id === specId ? { ...item, status: 'aprovado', assignedTo: userName, changeType: '', changeReason: '' } : item)) }));
       if (next && isDbId(specId)) updateSpecificationRow(specId, next).catch(() => {});
     },
-    requestChange: (projectId, specId, responsible) => {
+    requestChange: (projectId, specId, reason, changeType, assignee) => {
       const changed = (specsByProject[projectId] ?? []).find((item) => item.id === specId);
-      const next = changed ? { ...changed, status: 'troca' as ApprovalStatus, assignedTo: responsible } : null;
-      setSpecsByProject((current) => ({ ...current, [projectId]: (current[projectId] ?? []).map((item) => (item.id === specId ? { ...item, status: 'troca', assignedTo: responsible } : item)) }));
+      const next = changed ? { ...changed, status: 'troca' as ApprovalStatus, assignedTo: assignee, changeType, changeReason: reason } : null;
+      setSpecsByProject((current) => ({ ...current, [projectId]: (current[projectId] ?? []).map((item) => (item.id === specId ? { ...item, status: 'troca', assignedTo: assignee, changeType, changeReason: reason } : item)) }));
+      if (next && isDbId(specId)) updateSpecificationRow(specId, next).catch(() => {});
+    },
+    rejectChange: (projectId, specId) => {
+      const changed = (specsByProject[projectId] ?? []).find((item) => item.id === specId);
+      const next = changed ? { ...changed, status: 'pendente' as ApprovalStatus, changeType: '', changeReason: '' } : null;
+      setSpecsByProject((current) => ({ ...current, [projectId]: (current[projectId] ?? []).map((item) => (item.id === specId ? { ...item, status: 'pendente', changeType: '', changeReason: '' } : item)) }));
       if (next && isDbId(specId)) updateSpecificationRow(specId, next).catch(() => {});
     },
     pushActivity: (projectId, entry) => {

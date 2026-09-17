@@ -784,3 +784,7 @@ button { cursor: pointer; }
 .zone-add input:focus { border-color: hsl(var(--primary)); }
 .role-badge.approver { color: hsl(268 60% 42%); background: hsl(268 70% 60% / .16); }
 .share-role.approver { color: hsl(268 60% 42%); background: hsl(268 70% 60% / .16); }
+.button-danger { background: hsl(var(--destructive)); border-color: hsl(var(--destructive)); color: hsl(var(--destructive-foreground)); }
+.button-danger:hover { filter: brightness(0.95); }
+.pending-change { display: block; margin-top: 3px; color: hsl(28 80% 34%); font-size: 11px; line-height: 1.4; }
+.pending-change b { font-weight: 600; }

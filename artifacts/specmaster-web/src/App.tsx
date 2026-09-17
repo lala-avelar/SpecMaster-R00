@@ -88,7 +88,7 @@ import {
 } from '@/workspace-store';
 import { AuthProvider, DEMO_EMAIL, useAuth } from '@/auth-context';
 import { initialsOf } from '@/supabase';
-import { acceptInvitation, isDbId } from '@/data';
+import { acceptInvitation, fetchProjectMembers, isDbId, type MemberInfo } from '@/data';
 import AuthScreen from '@/pages/auth-screen';
 import ShareModal from '@/pages/share-modal';
 
@@ -600,7 +600,8 @@ function Portfolio() {
                 <div className="pending-main">
                   <p className="pending-title"><strong>{spec.item}</strong></p>
                   <span className="pending-meta"><span>{spec.environment}</span><i aria-hidden="true" /><span>{spec.zone}</span></span>
-                  <span className="pending-project">{projectName(spec.projectId)}</span>
+                  {spec.status === 'troca' && (spec.changeType || spec.changeReason) && <span className="pending-change"><b>{spec.changeType || 'Troca'}</b>{spec.changeReason ? ` — ${spec.changeReason}` : ''}</span>}
+                  <span className="pending-project">{projectName(spec.projectId)}{spec.assignedTo ? ` · para ${spec.assignedTo}` : ''}</span>
                 </div>
                 <span className={`pending-status ${spec.status}`}>{statusLabel(spec.status)}</span>
                 <div className="pending-actions">
@@ -692,7 +693,7 @@ function MatrixPage() {
   const meName = authUser?.name ?? CURRENT_USER;
   const meInitials = authUser?.initials ?? 'MR';
   const { projectId } = useParams<{ projectId?: string }>();
-  const { sampleMode, ready, specsByProject, activity, approvalRequest, dismissApproval, requestApproval, localProjects, autoImportProjectId, setAutoImportProjectId, projectNameOverrides, setSpec, addSpecs, removeSpec, seedProject, approveSpec, requestChange, pushActivity, activityOf, roleOf, zonesOf } = useWorkspace();
+  const { sampleMode, ready, specsByProject, activity, approvalRequest, dismissApproval, requestApproval, localProjects, autoImportProjectId, setAutoImportProjectId, projectNameOverrides, setSpec, addSpecs, removeSpec, seedProject, approveSpec, requestChange, rejectChange, pushActivity, activityOf, roleOf, zonesOf } = useWorkspace();
   const requestedId = projectId;
   const ownsRequested = Boolean(requestedId) && (sampleMode || localProjects.some((project) => project.id === requestedId));
   const id = ownsRequested ? requestedId! : sampleMode ? 'ed-santa-monica' : (localProjects[0]?.id ?? '');
@@ -719,6 +720,9 @@ function MatrixPage() {
   });
   const [changeRequest, setChangeRequest] = useState<MatrixSpec | null>(null);
   const [changeReason, setChangeReason] = useState('');
+  const [changeType, setChangeType] = useState(CHANGE_TYPES[0]);
+  const [changeAssignee, setChangeAssignee] = useState('');
+  const [teamMembers, setTeamMembers] = useState<MemberInfo[]>([]);
   const [newSpecOpen, setNewSpecOpen] = useState(false);
 
   const resolvedProject = isProjectDetail(projectQuery.data)
@@ -760,6 +764,20 @@ function MatrixPage() {
   useEffect(() => {
     if (projectZones.length > 0 && !projectZones.includes(zone)) setZone(projectZones[0]);
   }, [projectZones, zone]);
+
+  useEffect(() => {
+    let active = true;
+    fetchProjectMembers(id)
+      .then((members) => {
+        if (!active) return;
+        setTeamMembers(members);
+        setChangeAssignee((current) => current || (members.find((member) => member.userId !== authUser?.id && (member.role === 'admin' || member.role === 'approver'))?.name ?? members.find((member) => member.userId !== authUser?.id)?.name ?? members[0]?.name ?? ''));
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [id, authUser?.id]);
   const myPendingCount = useMemo(() => specs.filter((row) => row.assignedTo === meName && isPending(row)).length, [specs, meName]);
   const filtered = useMemo(() => zoneSpecs.filter((row) => [row.environment, row.element, row.item, row.dimension, row.finish, row.brand].join(' ').toLowerCase().includes(search.toLowerCase())), [zoneSpecs, search]);
   const budgetFiltered = useMemo(() => {
@@ -821,6 +839,13 @@ function MatrixPage() {
     pushActivity(id, { mark: meInitials, label: meName, action: 'aprovou', target: row.item, project: project.name, time: 'agora', tone: 'ink' });
     dismissApproval();
     pushNotice(`"${row.item}" aprovado.`);
+  };
+
+  const rejectRow = (row: MatrixSpec) => {
+    rejectChange(id, row.id);
+    pushActivity(id, { mark: meInitials, label: meName, action: 'recusou a troca de', target: row.item, project: project.name, time: 'agora', tone: 'coral' });
+    dismissApproval();
+    pushNotice(`Troca de "${row.item}" recusada.`);
   };
 
   const openApproval = (row: MatrixSpec) => requestApproval(id, row.id);
@@ -898,7 +923,7 @@ function MatrixPage() {
           <p className="matrix-subtitle">{project.client} <span>·</span> {project.location}</p>
         </div>
         <div className="matrix-header-actions">
-          <button type="button" className="button button-quiet" onClick={share} data-testid="button-share-project"><Share2 size={15} /> {shareState ? 'Link copiado' : 'Compartilhar'}</button>
+          <button type="button" className="button button-quiet" onClick={share} data-testid="button-share-project"><Share2 size={15} /> {canManage ? (shareState ? 'Link copiado' : 'Compartilhar') : 'Equipe'}</button>
           <button type="button" className="button button-quiet" onClick={exportCSV} data-testid="button-export-csv"><Download size={15} /> Exportar CSV</button>
           <button type="button" className="button button-quiet" onClick={() => window.print()} data-testid="button-export-print"><Printer size={15} /> Imprimir</button>
         </div>
@@ -944,8 +969,8 @@ function MatrixPage() {
       {notice && <div className="toast-note page-enter" role="status" data-testid="status-matrix-toast"><Check size={15} /> {notice}</div>}
       {importOpen && <ImportModal currentUser={meName} onClose={() => setImportOpen(false)} onImport={importRows} />}
       {newSpecOpen && <NewSpecModal defaultResponsible={meName} defaultZone={zone} zones={projectZones} onClose={() => setNewSpecOpen(false)} onSubmit={createSpec} />}
-            {approvalSpec && <ApprovalModal spec={approvalSpec} projectName={project.name} onClose={dismissApproval} onApprove={approveRow} />}
-      {changeRequest && <ChangeRequestModal row={changeRequest} reason={changeReason} onReasonChange={setChangeReason} onClose={() => { setChangeRequest(null); setChangeReason(''); }} onSubmit={() => { const row = changeRequest; setChangeRequest(null); setChangeReason(''); requestChange(id, row.id, meName); pushActivity(id, { mark: meInitials, label: meName, action: 'solicitou troca em', target: row.item, project: project.name, time: 'agora', tone: 'amber' }); pushNotice('Solicitação de troca registrada.'); }} />}
+            {approvalSpec && <ApprovalModal spec={approvalSpec} projectName={project.name} onClose={dismissApproval} onApprove={approveRow} onReject={rejectRow} />}
+      {changeRequest && <ChangeRequestModal row={changeRequest} reason={changeReason} changeType={changeType} members={teamMembers} assignee={changeAssignee} onReasonChange={setChangeReason} onTypeChange={setChangeType} onAssigneeChange={setChangeAssignee} onClose={() => { setChangeRequest(null); setChangeReason(''); }} onSubmit={() => { const row = changeRequest; setChangeRequest(null); setChangeReason(''); requestChange(id, row.id, changeReason.trim(), changeType, changeAssignee); pushActivity(id, { mark: meInitials, label: meName, action: 'solicitou troca em', target: `${row.item} (para ${changeAssignee})`, project: project.name, time: 'agora', tone: 'amber' }); pushNotice(`Solicitação enviada para ${changeAssignee}.`); }} />}
       {shareOpen && <ShareModal projectId={id} projectName={project.name} currentUserId={authUser?.id ?? ''} canManage={canManage} onClose={() => setShareOpen(false)} />}
     </div>
   );
@@ -1182,7 +1207,11 @@ function ImportModal({ currentUser = CURRENT_USER, onClose, onImport }: { curren
   );
 }
 
-function ChangeRequestModal({ row, reason, onReasonChange, onClose, onSubmit }: { row: MatrixSpec; reason: string; onReasonChange: (value: string) => void; onClose: () => void; onSubmit: () => void }) {
+const CHANGE_TYPES = ['Valor acima da verba', 'Material inviável tecnicamente', 'Indisponível / fora de linha', 'Outro'];
+
+function ChangeRequestModal({ row, reason, changeType, members, assignee, onReasonChange, onTypeChange, onAssigneeChange, onClose, onSubmit }: { row: MatrixSpec; reason: string; changeType: string; members: MemberInfo[]; assignee: string; onReasonChange: (value: string) => void; onTypeChange: (value: string) => void; onAssigneeChange: (value: string) => void; onClose: () => void; onSubmit: () => void }) {
+  const approvers = members.filter((member) => member.role === 'admin' || member.role === 'approver');
+  const options = approvers.length > 0 ? approvers : members;
   return (
     <ModalShell>
       <div className="import-modal change-request-modal page-enter" role="dialog" aria-modal="true" aria-labelledby="change-request-title">
@@ -1190,11 +1219,13 @@ function ChangeRequestModal({ row, reason, onReasonChange, onClose, onSubmit }: 
         <div className="change-comparison">
           <div><span>ITEM ATUAL</span><strong>{row.item}</strong><small>{row.brand} · {money(Number(row.quotedPrice))}</small></div>
           <ArrowUpRight size={18} />
-          <div><span>ITEM PROPOSTO</span><strong>A definir</strong><small>Informe o novo item após enviar</small></div>
+          <div><span>O QUE ACONTECE</span><strong>Vai para aprovação</strong><small>O responsável decide sobre a troca</small></div>
         </div>
         <div className="cost-difference"><span>Diferença estimada</span><strong className={Number(row.quotedPrice) > Number(row.budget) ? 'over-text' : 'under-text'}>{Number(row.quotedPrice) > Number(row.budget) ? '+' : '-'}{money(Math.abs(Number(row.quotedPrice) - Number(row.budget)))}</strong></div>
-        <label className="reason-field"><span>Motivo da solicitação</span><textarea value={reason} onChange={(event) => onReasonChange(event.target.value)} placeholder="Explique por que este item precisa ser substituído." data-testid="input-change-reason" /></label>
-        <div className="modal-actions"><button type="button" className="button button-quiet" onClick={onClose}>Cancelar</button><button type="button" className="button button-primary" onClick={onSubmit} disabled={!reason.trim()} data-testid="button-submit-change-request">Enviar para Aprovação Simultânea</button></div>
+        <label className="reason-field"><span>Enviar para (responsável)</span><select value={assignee} onChange={(event) => onAssigneeChange(event.target.value)} data-testid="select-change-assignee"><option value="" disabled>Selecione um aprovador</option>{options.map((member) => <option key={member.userId} value={member.name}>{member.name}{member.role ? ` (${member.role})` : ''}</option>)}</select></label>
+        <label className="reason-field"><span>Tipo de solicitação</span><select value={changeType} onChange={(event) => onTypeChange(event.target.value)} data-testid="select-change-type">{CHANGE_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}</select></label>
+        <label className="reason-field"><span>Motivo da solicitação</span><textarea value={reason} onChange={(event) => onReasonChange(event.target.value)} placeholder="Explique por que este item precisa ser trocado." data-testid="input-change-reason" /></label>
+        <div className="modal-actions"><button type="button" className="button button-quiet" onClick={onClose}>Cancelar</button><button type="button" className="button button-primary" onClick={onSubmit} disabled={!reason.trim() || !assignee} data-testid="button-submit-change-request">Enviar para {assignee || 'responsável'}</button></div>
       </div>
     </ModalShell>
   );
@@ -1257,10 +1288,11 @@ function NewSpecModal({ defaultResponsible = CURRENT_USER, defaultZone, zones, o
   );
 }
 
-function ApprovalModal({ spec, projectName, onClose, onApprove }: { spec: MatrixSpec; projectName: string; onClose: () => void; onApprove: (spec: MatrixSpec) => void }) {
+function ApprovalModal({ spec, projectName, onClose, onApprove, onReject }: { spec: MatrixSpec; projectName: string; onClose: () => void; onApprove: (spec: MatrixSpec) => void; onReject: (spec: MatrixSpec) => void }) {
   const under = Number(spec.quotedPrice) <= Number(spec.budget);
   const delta = Number(spec.quotedPrice) - Number(spec.budget);
   const statusLabel = spec.status === 'troca' ? 'Solicitação de troca' : spec.status === 'revisao' ? 'Revisão pendente' : 'Aprovação pendente';
+  const isChange = spec.status === 'troca';
   return (
     <ModalShell>
       <div className="import-modal approval-modal page-enter" role="dialog" aria-modal="true" aria-labelledby="approval-title">
@@ -1277,12 +1309,17 @@ function ApprovalModal({ spec, projectName, onClose, onApprove }: { spec: Matrix
           <div><dt>Custo previsto</dt><dd>{money(Number(spec.budget))}</dd></div>
           <div><dt>Cotado</dt><dd className={under ? 'under-text' : 'over-text'}>{money(Number(spec.quotedPrice))}</dd></div>
           <div><dt>Δ</dt><dd className={delta > 0 ? 'over-text' : 'under-text'}>{delta === 0 ? '—' : `${delta > 0 ? '+' : '−'}${BRL_NUM.format(Math.abs(delta))}`}</dd></div>
-          <div><dt>Responsável</dt><dd>{spec.assignedTo}</dd></div>
+          <div><dt>Solicitado por</dt><dd>{spec.assignedTo}</dd></div>
         </dl>
-        {spec.status === 'troca' && <div className="approval-note"><AlertTriangle size={14} /> Solicitação de troca — um novo item será proposto pelo responsável.</div>}
+        {isChange && (
+          <div className="approval-note">
+            <AlertTriangle size={14} /> <span><strong>{spec.changeType || 'Troca solicitada'}</strong>{spec.changeReason ? ` — ${spec.changeReason}` : ''}</span>
+          </div>
+        )}
         <div className="modal-actions">
           <button type="button" className="button button-quiet" onClick={onClose}>Agora não</button>
-          <button type="button" className="button button-primary" onClick={() => onApprove(spec)} data-testid="button-approve-modal"><Check size={15} /> Aprovar especificação</button>
+          {isChange && <button type="button" className="button button-danger" onClick={() => onReject(spec)} data-testid="button-reject-modal"><X size={15} /> Recusar troca</button>}
+          <button type="button" className="button button-primary" onClick={() => onApprove(spec)} data-testid="button-approve-modal"><Check size={15} /> {isChange ? 'Aprovar troca' : 'Aprovar especificação'}</button>
         </div>
       </div>
     </ModalShell>
