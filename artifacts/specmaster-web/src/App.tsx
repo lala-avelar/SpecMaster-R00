@@ -93,6 +93,17 @@ import ShareModal from '@/pages/share-modal';
 
 const queryClient = new QueryClient();
 
+function captureInviteToken() {
+  if (typeof window === 'undefined') return;
+  const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+  const match = window.location.pathname.match(/\/join\/([^/?#]+)/);
+  if (match) {
+    localStorage.setItem('specmaster:pending-invite', decodeURIComponent(match[1]));
+    window.history.replaceState(null, '', `${base}/`);
+  }
+}
+captureInviteToken();
+
 type LocalProject = Project;
 type LocalSpec = Specification;
 
@@ -1469,7 +1480,10 @@ function PendingInviteHandler() {
           setLocation(`/projects/${projectId}`);
         }
       })
-      .catch(() => {});
+      .catch((error: unknown) => {
+        const message = error && typeof error === 'object' && 'message' in error ? String((error as { message: unknown }).message) : String(error);
+        window.alert(`Não foi possível entrar no projeto pelo link: ${message}`);
+      });
   }, [user, setLocation, reload]);
   return null;
 }
@@ -1511,15 +1525,6 @@ function AuthenticatedApp({ userKey, userName }: { userKey: string; userName: st
 
 function AppGate() {
   const { user, loading } = useAuth();
-
-  useEffect(() => {
-    const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-    const match = window.location.pathname.match(/\/join\/([^/?#]+)/);
-    if (match) {
-      localStorage.setItem('specmaster:pending-invite', decodeURIComponent(match[1]));
-      window.history.replaceState(null, '', `${base}/`);
-    }
-  }, []);
 
   if (loading) {
     return (

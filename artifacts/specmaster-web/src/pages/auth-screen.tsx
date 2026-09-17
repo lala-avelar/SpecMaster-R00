@@ -142,6 +142,7 @@ const FEATURES = [
 
 export default function AuthScreen() {
   const { login, signup, validateLogin, validateSignup } = useAuth();
+  const hasInvite = typeof window !== 'undefined' && Boolean(localStorage.getItem('specmaster:pending-invite'));
 
   const [tab, setTab] = useState<'login' | 'signup'>('login');
   const [loginValues, setLoginValues] = useState<LoginValues>(EMPTY_LOGIN);
@@ -265,6 +266,11 @@ export default function AuthScreen() {
           <div className="rounded-xl border border-border bg-card shadow-[0_1px_2px_rgba(16,24,40,0.06)]">
             <div className="px-5 pt-4 sm:px-5">
               <Tabs value={tab} onValueChange={switchTab} className="w-full">
+                {hasInvite && (
+                  <div className="mb-3 flex items-start gap-2 rounded-md border border-primary/30 bg-primary/5 px-2.5 py-2 text-[11.5px] leading-snug text-foreground">
+                    <Mail className="size-3.5 shrink-0 mt-px text-primary" /> Você recebeu um convite. Entre ou crie sua conta para acessar o projeto.
+                  </div>
+                )}
                 <TabsList className="grid w-full grid-cols-2 bg-muted/70 p-0.5">
                   <TabsTrigger value="login">Entrar</TabsTrigger>
                   <TabsTrigger value="signup">Criar conta</TabsTrigger>
