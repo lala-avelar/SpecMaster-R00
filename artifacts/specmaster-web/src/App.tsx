@@ -189,15 +189,72 @@ const MATRIX_SPECS: MatrixSpec[] = [
   { id: 'spec-29', environment: 'Fachada Principal', element: 'Peitoril', item: 'Peitoril em granito', dimension: '20x120 cm', finish: 'Polido', brand: 'Marmoraria Z', budget: 90, quotedPrice: 95, revision: 'R02', assignedTo: 'Marina Reis', status: 'revisao', zone: 'Fachada', updatedAt: '2024-06-07T15:15:00Z' },
 ];
 
-const REVESTIMENTOS = ['Piso', 'Parede', 'Rodapé', 'Soleira/Filete', 'Bancada', 'Teto', 'Peitoril', 'Sóculo'];
-const LOUCAS_E_METAIS = ['Cuba', 'Tanque', 'Válvula de Cuba', 'Sifão', 'Torneira', 'Bacia Sanitária', 'Ducha Higiênica', 'Acabamento de Registro', 'Acionamento de Chuveiro', 'Ralo'];
-const COMPLEMENTARES = ['Porta', 'Maçaneta', 'Iluminação', 'Acabamento Elétrico'];
+const REVESTIMENTOS = ['Pisos', 'Paredes', 'Teto/Forro', 'Rodapés', 'Bancadas', 'Soleiras/Filete', 'Peitoris', 'Fiadas e baguetes', 'Sóculos', 'Revestimentos de fachada'];
+const LOUCAS_E_METAIS = ['Cubas', 'Tanques', 'Bacias sanitárias', 'Bidês e mictórios', 'Torneira', 'Chuveiros/duchas', 'Duchas higiênicas', 'Sifões', 'Registros e bases de registro', 'Válvulas de escoamento', 'Ralos', 'Porta-toalhas', 'Papeleiras', 'Cabides', 'Saboneteiras'];
+const COMPLEMENTARES = ['Portas', 'Janelas e esquadrias', 'Fechaduras e maçanetas', 'Iluminação', 'Interruptores e tomadas', 'Roda-tetos, sancas e cortineiros', 'Divisórias, boxes de banheiro', 'Espelhos', 'Guarda-corpos e corrimãos', 'Eletrodomésticos'];
+const LEGACY_ELEMENT: Record<string, string> = {
+  'Piso': 'Pisos', 'Parede': 'Paredes', 'Teto': 'Teto/Forro', 'Rodapé': 'Rodapés', 'Bancada': 'Bancadas',
+  'Soleira/Filete': 'Soleiras/Filete', 'Peitoril': 'Peitoris', 'Soco': 'Sóculos', 'Sóculo': 'Sóculos',
+  'Cuba': 'Cubas', 'Tanque': 'Tanques', 'Bacia Sanitária': 'Bacias sanitárias', 'Bidê': 'Bidês e mictórios', 'Mictório': 'Bidês e mictórios',
+  'Torneira': 'Torneira', 'Torneiras, misturadores e monocomandos': 'Torneira', 'Chuveiro': 'Chuveiros/duchas', 'Ducha Higiênica': 'Duchas higiênicas',
+  'Sifão': 'Sifões', 'Acabamento de Registro': 'Registros e bases de registro', 'Válvula de Cuba': 'Válvulas de escoamento', 'Válvula de escoamento': 'Válvulas de escoamento',
+  'Ralo': 'Ralos', 'Porta': 'Portas', 'Fechadura': 'Fechaduras e maçanetas', 'Maçaneta': 'Fechaduras e maçanetas',
+  'Iluminação': 'Iluminação', 'Acabamento Elétrico': 'Interruptores e tomadas', 'Interruptor': 'Interruptores e tomadas', 'Tomada': 'Interruptores e tomadas',
+  'Acionamento de Chuveiro': 'Chuveiros/duchas',
+};
+const ICON_ALIASES: Record<string, string> = Object.fromEntries(Object.entries(LEGACY_ELEMENT).map(([oldKey, canonical]) => [canonical, oldKey]));
 const CATEGORY_ELEMENTS: Record<string, string[]> = {
   'Revestimentos': REVESTIMENTOS,
   'Louças e Metais': LOUCAS_E_METAIS,
   'Complementares': COMPLEMENTARES,
 };
 const ALL_ZONES = 'Todas';
+
+const ELEMENT_EXAMPLES: Record<string, { item: string; dimension: string; finish: string; brand: string }> = {
+  'Pisos': { item: 'Porcelanato Bianco Covelano', dimension: 'Ex: 90x90 cm', finish: 'Ex: Natural retificado', brand: 'Ex: Portobello' },
+  'Paredes': { item: 'Porcelanato acetinado', dimension: 'Ex: 60x120 cm', finish: 'Ex: Acetinado', brand: 'Ex: Portobello' },
+  'Teto/Forro': { item: 'Forro de gesso acartonado', dimension: 'Ex: 60x60 cm', finish: 'Ex: Pintura fosca', brand: 'Ex: Placo' },
+  'Rodapés': { item: 'Rodapé de MDF', dimension: 'Ex: 10x2400 mm', finish: 'Ex: Branco', brand: 'Ex: Arauco' },
+  'Bancadas': { item: 'Bancada em quartzo', dimension: 'Ex: 2400x600x20 mm', finish: 'Ex: Levigado', brand: 'Ex: Marmoraria' },
+  'Soleiras/Filete': { item: 'Soleira em granito', dimension: 'Ex: 90x15 cm', finish: 'Ex: Polido', brand: 'Ex: Marmoraria' },
+  'Peitoris': { item: 'Peitoril em granito', dimension: 'Ex: 20x120 cm', finish: 'Ex: Polido', brand: 'Ex: Marmoraria' },
+  'Fiadas e baguetes': { item: 'Filete de porcelanato', dimension: 'Ex: 7x90 cm', finish: 'Ex: Brilhante', brand: 'Ex: Portobello' },
+  'Sóculos': { item: 'Sóculo de porcelanato', dimension: 'Ex: 10x90 cm', finish: 'Ex: Brilhante', brand: 'Ex: Portobello' },
+  'Revestimentos de fachada': { item: 'Porcelanato de fachada', dimension: 'Ex: 60x120 cm', finish: 'Ex: Fosco', brand: 'Ex: Portobello' },
+  'Cubas': { item: 'Cuba de embutir', dimension: 'Ex: 50x40 cm', finish: 'Ex: Branco brilho', brand: 'Ex: Deca' },
+  'Tanques': { item: 'Tanque de sobrepor', dimension: 'Ex: 40x50 cm', finish: 'Ex: Branco', brand: 'Ex: Deca' },
+  'Bacias sanitárias': { item: 'Bacia com caixa acoplada', dimension: 'Ex: 37x70 cm', finish: 'Ex: Branco brilho', brand: 'Ex: Deca' },
+  'Bidês e mictórios': { item: 'Bidê de sobrepor', dimension: 'Ex: 37x55 cm', finish: 'Ex: Branco brilho', brand: 'Ex: Deca' },
+  'Torneira': { item: 'Torneira de mesa monocomando', dimension: 'Ex: Bica alta', finish: 'Ex: Cromada', brand: 'Ex: Docol' },
+  'Chuveiros/duchas': { item: 'Ducha de parede', dimension: 'Ex: 20 cm', finish: 'Ex: Cromada', brand: 'Ex: Docol' },
+  'Duchas higiênicas': { item: 'Ducha higiênica de parede', dimension: 'Ex: 1,20 m', finish: 'Ex: Cromada', brand: 'Ex: Docol' },
+  'Sifões': { item: 'Sifão flexível', dimension: 'Ex: 1 1/2"', finish: 'Ex: Cromado', brand: 'Ex: Tigre' },
+  'Registros e bases de registro': { item: 'Registro de gaveta', dimension: 'Ex: 1/2"', finish: 'Ex: Cromado', brand: 'Ex: Docol' },
+  'Válvulas de escoamento': { item: 'Válvula de escoamento', dimension: 'Ex: 1 1/2"', finish: 'Ex: Cromada', brand: 'Ex: Deca' },
+  'Ralos': { item: 'Ralo linear', dimension: 'Ex: 100x60 mm', finish: 'Ex: Cromado', brand: 'Ex: Docol' },
+  'Porta-toalhas': { item: 'Porta-toalhas de parede', dimension: 'Ex: 60 cm', finish: 'Ex: Cromado', brand: 'Ex: Docol' },
+  'Papeleiras': { item: 'Papeleira de parede', dimension: 'Ex: 20 cm', finish: 'Ex: Cromada', brand: 'Ex: Docol' },
+  'Cabides': { item: 'Cabide de parede', dimension: 'Ex: 4 ganchos', finish: 'Ex: Cromado', brand: 'Ex: Docol' },
+  'Saboneteiras': { item: 'Saboneteira de parede', dimension: 'Ex: 12 cm', finish: 'Ex: Cromada', brand: 'Ex: Docol' },
+  'Portas': { item: 'Porta de madeira lisa', dimension: 'Ex: 80x210 cm', finish: 'Ex: Branco', brand: 'Ex: Madeireira Sul' },
+  'Janelas e esquadrias': { item: 'Janela de correr em alumínio', dimension: 'Ex: 120x120 cm', finish: 'Ex: Champanhe', brand: 'Ex: Ação Esquadrias' },
+  'Fechaduras e maçanetas': { item: 'Maçaneta de porta', dimension: 'Ex: 55 mm', finish: 'Ex: Cromada', brand: 'Ex: Docol' },
+  'Iluminação': { item: 'Spot LED embutido', dimension: 'Ex: Ø 90 mm', finish: 'Ex: 4000K', brand: 'Ex: Ledtech' },
+  'Interruptores e tomadas': { item: 'Tomada 2P+T 20A', dimension: 'Ex: Bivolt', finish: 'Ex: Branco', brand: 'Ex: Pial' },
+  'Roda-tetos, sancas e cortineiros': { item: 'Sanca de gesso', dimension: 'Ex: 15 cm', finish: 'Ex: Pintura fosca', brand: 'Ex: Placo' },
+  'Divisórias, boxes de banheiro': { item: 'Box de vidro temperado', dimension: 'Ex: 1900 mm', finish: 'Ex: Incolor', brand: 'Ex: Vidraçaria' },
+  'Espelhos': { item: 'Espelho cristal', dimension: 'Ex: 80x120 cm', finish: 'Ex: Biselado', brand: 'Ex: Vidraçaria' },
+  'Guarda-corpos e corrimãos': { item: 'Guarda-corpo de vidro', dimension: 'Ex: 1100 mm', finish: 'Ex: Incolor', brand: 'Ex: Vidraçaria' },
+  'Eletrodomésticos': { item: 'Cooktop embutir', dimension: 'Ex: 5 bocas', finish: 'Ex: Inox', brand: 'Ex: Brastemp' },
+};
+
+const CATEGORY_EXAMPLES: Record<string, { item: string; dimension: string; finish: string; brand: string }> = {
+  'Revestimentos': ELEMENT_EXAMPLES['Pisos'],
+  'Louças e Metais': ELEMENT_EXAMPLES['Torneira'],
+  'Complementares': ELEMENT_EXAMPLES['Portas'],
+};
+
+const NEUTRAL_EXAMPLE = { item: 'Descreva o item', dimension: 'Ex: medidas', finish: 'Ex: acabamento', brand: 'Ex: marca / fornecedor' };
 
 const CASA_SERRA_SPECS: MatrixSpec[] = [
   { id: 'cs-1', environment: 'Estar', element: 'Piso', item: 'Piso vinílico amadeirado', dimension: '1220 × 180 mm', finish: 'Carvalho natural / E=5 mm', brand: 'Tarkett — Injoy', budget: 12800, quotedPrice: 11640, revision: 'R03', assignedTo: 'Marina Reis', status: 'pendente', zone: 'Apartamentos', updatedAt: '2024-06-14T10:10:00Z' },
@@ -758,7 +815,10 @@ function MatrixPage() {
   const specs: MatrixSpec[] = specsByProject[id] ?? [];
   const projectZones = zonesOf(id);
   const isOverBudget = (row: MatrixSpec) => specTotalValue(row) > specBudgetValue(row);
-  const categoryFor = (row: MatrixSpec) => LOUCAS_E_METAIS.includes(row.element) ? 'Louças e Metais' : REVESTIMENTOS.includes(row.element) ? 'Revestimentos' : 'Complementares';
+  const categoryFor = (row: MatrixSpec) => {
+    const element = LEGACY_ELEMENT[row.element] ?? row.element;
+    return LOUCAS_E_METAIS.includes(element) ? 'Louças e Metais' : REVESTIMENTOS.includes(element) ? 'Revestimentos' : 'Complementares';
+  };
   const hasAllTab = projectZones.length > 1;
   const zoneSpecs = useMemo(() => (zone === ALL_ZONES ? specs : specs.filter((row) => row.zone === zone)), [specs, zone]);
   const zoneCounts = useMemo(() => {
@@ -1015,7 +1075,8 @@ function AutoTextarea({ value, onChange, onCommit, testId, readOnly }: { value: 
 }
 
 function ElementGlyph({ element }: { element: string }) {
-  const Icon = ELEMENT_ICONS[element] ?? Box;
+  const key = ELEMENT_ICONS[element] ? element : (ICON_ALIASES[element] ?? element);
+  const Icon = ELEMENT_ICONS[key] ?? Box;
   return <Icon size={15} strokeWidth={1.9} />;
 }
 
@@ -1242,6 +1303,7 @@ function NewSpecModal({ defaultResponsible = CURRENT_USER, defaultZone, zones, o
   const { specsByProject } = useWorkspace();
   const [form, setForm] = useState({ zone: defaultZone, category: 'Revestimentos', environment: '', element: '', item: '', dimension: '', finish: '', brand: '', budget: '', quotedPrice: '', areaTotal: '', responsible: defaultResponsible });
   const elementOptions = useMemo(() => CATEGORY_ELEMENTS[form.category] ?? [], [form.category]);
+  const example = ELEMENT_EXAMPLES[form.element] ?? CATEGORY_EXAMPLES[form.category] ?? NEUTRAL_EXAMPLE;
   const set = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
   const setCategory = (value: string) => setForm((current) => ({ ...current, category: value, element: (CATEGORY_ELEMENTS[value] ?? []).includes(current.element) ? current.element : '' }));
   const valid = form.zone.trim().length > 0 && form.category.trim().length > 0 && form.environment.trim().length > 0 && form.element.trim().length > 0 && form.item.trim().length > 0;
@@ -1281,10 +1343,10 @@ function NewSpecModal({ defaultResponsible = CURRENT_USER, defaultZone, zones, o
           <label className="spec-form-field"><span>Categoria *</span><select value={form.category} onChange={(event) => setCategory(event.target.value)} data-testid="input-new-category"><option>Revestimentos</option><option>Louças e Metais</option><option>Complementares</option></select></label>
           <label className="spec-form-field"><span>Ambiente *</span><input value={form.environment} onChange={(event) => set('environment', event.target.value)} placeholder="Ex: Cozinha" data-testid="input-new-environment" /></label>
           <label className="spec-form-field"><span>Elemento *</span><select value={form.element} onChange={(event) => set('element', event.target.value)} data-testid="input-new-element"><option value="" disabled>Selecione um elemento</option>{elementOptions.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
-          <label className="spec-form-field"><span>Item / Descrição *</span><input value={form.item} onChange={(event) => set('item', event.target.value)} placeholder="Ex: Porcelanato Bianco Covelano" data-testid="input-new-item" /></label>
-          <label className="spec-form-field"><span>Dimensão (opcional)</span><input value={form.dimension} onChange={(event) => set('dimension', event.target.value)} placeholder="Ex: 90x90 cm" data-testid="input-new-dimension" /></label>
-          <label className="spec-form-field"><span>Acabamento (opcional)</span><input value={form.finish} onChange={(event) => set('finish', event.target.value)} placeholder="Ex: Nat. Retificado" data-testid="input-new-finish" /></label>
-          <label className="spec-form-field"><span>Marca / Fornecedor (opcional)</span><input value={form.brand} onChange={(event) => set('brand', event.target.value)} placeholder="Ex: Portobello" data-testid="input-new-brand" /></label>
+          <label className="spec-form-field"><span>Item / Descrição *</span><input value={form.item} onChange={(event) => set('item', event.target.value)} placeholder={example.item} data-testid="input-new-item" /></label>
+          <label className="spec-form-field"><span>Dimensão (opcional)</span><input value={form.dimension} onChange={(event) => set('dimension', event.target.value)} placeholder={example.dimension} data-testid="input-new-dimension" /></label>
+          <label className="spec-form-field"><span>Acabamento (opcional)</span><input value={form.finish} onChange={(event) => set('finish', event.target.value)} placeholder={example.finish} data-testid="input-new-finish" /></label>
+          <label className="spec-form-field"><span>Marca / Fornecedor (opcional)</span><input value={form.brand} onChange={(event) => set('brand', event.target.value)} placeholder={example.brand} data-testid="input-new-brand" /></label>
           <label className="spec-form-field"><span>Verba prevista (R$) (opcional)</span><input type="number" value={form.budget} onChange={(event) => set('budget', event.target.value)} placeholder="0,00" data-testid="input-new-budget" /></label>
           <label className="spec-form-field"><span>Preço cotado (R$) (opcional)</span><input type="number" value={form.quotedPrice} onChange={(event) => set('quotedPrice', event.target.value)} placeholder="0,00" data-testid="input-new-quoted" /></label>
           <label className="spec-form-field"><span>Área/Quantidade (opcional)</span><input type="number" value={form.areaTotal} onChange={(event) => set('areaTotal', event.target.value)} placeholder="Ex: 38" data-testid="input-new-area" /></label>

@@ -788,3 +788,45 @@ button { cursor: pointer; }
 .button-danger:hover { filter: brightness(0.95); }
 .pending-change { display: block; margin-top: 3px; color: hsl(28 80% 34%); font-size: 11px; line-height: 1.4; }
 .pending-change b { font-weight: 600; }
+
+/* Consistência dos pop-ups: mesma largura + texto encapsulado */
+.import-modal,
+.new-spec-modal,
+.approval-modal,
+.new-project-modal,
+.change-request-modal,
+.share-modal {
+  width: min(100%, 560px);
+  max-height: min(88vh, 760px);
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  box-sizing: border-box;
+}
+.import-modal-wide { width: min(100%, 560px); }
+.import-modal .modal-top h2,
+.change-comparison strong,
+.change-comparison small,
+.approval-item-head strong,
+.approval-item-head small,
+.approval-note,
+.approval-note span,
+.approval-details dd,
+.reason-field,
+.spec-form-field span,
+.share-member-id strong,
+.share-member-id small {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.approval-details dd { white-space: normal; }
+
+/* Impede que opções longas estiquem a caixa do modal */
+.spec-form { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.spec-form-field { min-width: 0; }
+.spec-form-field input,
+.spec-form-field select,
+.reason-field select,
+.share-invite-row select,
+.share-invite-row input { width: 100%; min-width: 0; }
+.spec-form-field select,
+.reason-field select { text-overflow: ellipsis; }
